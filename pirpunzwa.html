@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farmer ID status by bucket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<script>
+/* ============ SETTINGS – edit these lines only ============ */
+const VILLAGE = "Pirpunzwa";   // village name – must match the village registered in the admin page
+const TEHSIL = "Kupwara";     // tehsil – must match too
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwD4Fwxu4vyXw179KWFoSpYNlq5pcOTp_X0UwLHqIIFOPFvV1A_eur5v33Rn1MMWWk/exec";  // paste the Apps Script /exec URL to save to Google Sheets
+let REASONS = [];                // filled from the 'Reasons' tab of the Google Sheet when the page loads
+</script>
+<style>
+:root{
+  --ink:#1c2a36; --ink-2:#4a5a67; --ink-3:#7c8a95;
+  --paper:#f5f6f3; --card:#fff; --line:#dde2dc; --line-2:#eceee9;
+  --field:#2f6b4f; --field-bg:#e6f0ea;
+  --amber:#8a5a10; --amber-bg:#fbf1dc;
+  --brick:#a8432a; --brick-bg:#f8e3dc;
+  --slate:#43607a; --slate-bg:#e3eaf1;
+  --orange:#b85a0d; --orange-bg:#fdecd9; --orange-2:#f3c9a0;
+  --hit:#fff1a8;
+  --focus:#2a6fdb; --submit-bg:#f1f4f8; --submit-line:#b9c6d4; --card-line:#c9d0d6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e6ebef; --ink-2:#b3bec7; --ink-3:#86939d;
+    --paper:#141a1f; --card:#1c242b; --line:#2f3a43; --line-2:#252f37;
+    --field:#6cc19a; --field-bg:#1e3329; --amber:#f0c677; --amber-bg:#3a2d17;
+    --brick:#ef8f76; --brick-bg:#3b231d; --slate:#9ab8d3; --slate-bg:#22303d; --submit-bg:#1f2830; --submit-line:#3f4f5d; --card-line:#3a4650; --orange:#f5a45c; --orange-bg:#3a2715; --orange-2:#6b4320; --hit:#5a4d12;
+  }
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 130px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:0 18px}
+
+header{padding:26px 0 16px}
+h1{font:600 27px/1.15 "IBM Plex Serif",Georgia,serif;margin:0}
+.sub{color:var(--ink-2);margin:6px 0 0}
+.meta{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:14px}
+.reviewer{display:flex;align-items:center;gap:8px}
+.reviewer label{color:var(--ink-2);font-size:14px}
+.reviewer input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 10px;width:210px}
+.reviewer input.need{border-color:var(--brick);box-shadow:0 0 0 3px var(--brick-bg)}
+.sync{font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.sync.ok i{background:var(--field)} .sync.busy i{background:#c98a1b} .sync.err i{background:var(--brick)}
+.dlbtn{border:1.5px solid var(--slate);background:var(--card);color:var(--slate);border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.dlbtn:hover{background:color-mix(in srgb,var(--slate) 8%,var(--card))}
+.dlbtn:disabled{opacity:.6;cursor:default}
+.linkbtn{background:none;border:0;padding:0;color:var(--slate);text-decoration:underline;cursor:pointer;font-size:13px}
+
+.stats{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:18px;font-variant-numeric:tabular-nums}
+.stat b{font-size:22px;font-weight:600;display:block;line-height:1.1}
+.stat span{font-size:13px;color:var(--ink-2)}
+.stat.g b{color:var(--field)} .stat.n b{color:var(--brick)}
+.bigbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex;margin-top:12px;max-width:520px}
+.bigbar i{display:block;height:100%}
+
+.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding:10px 0}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.smode{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.smode button{border:0;background:none;padding:8px 12px;font-size:14px;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+.smode button+button{border-left:1px solid var(--line)}
+.smode button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.qinfo{font-size:13px;color:var(--ink-2);padding-top:6px}
+.qinfo:empty{display:none}
+.qinfo b{color:var(--ink)}
+.search{font-size:16px;flex:1 1 220px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-top:8px}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+.chip em{font-style:normal;color:var(--ink-3);margin-left:4px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.chip[aria-pressed="true"] em{color:var(--paper);opacity:.7}
+
+main{padding-top:14px}
+.group{border-left:5px solid var(--orange);background:var(--orange-bg);border-radius:10px;padding:10px 10px 2px;margin:0 0 14px}
+.group.med{border-left-style:dashed}
+.ghead{font-size:14px;color:var(--orange);padding:0 4px 8px}
+.ghead b{font-weight:600}
+.warnline{font-size:13px;color:var(--brick);padding:0 4px 8px}
+.warnline:empty{display:none}
+
+.bk{background:var(--card);border:1px solid var(--card-line);border-radius:12px;margin:0 0 18px;display:grid;grid-template-columns:1fr minmax(280px,360px);box-shadow:0 1px 2px rgba(20,30,40,.06),0 3px 10px rgba(20,30,40,.05)}
+.bk.filled{border-color:var(--card-line)}
+.info{padding:14px 16px;min-width:0}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.uid{margin-top:2px;font-size:11px;color:var(--ink-3);font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+.bid{font-weight:600;font-variant-numeric:tabular-nums;background:var(--ink);color:var(--paper);border-radius:6px;padding:2px 9px;font-size:14px}
+.nm{font-weight:600;font-size:16px}
+.par{color:var(--ink-2);font-size:14px}
+.par::before{content:"Parentage ";color:var(--ink-3)}
+.facts{font-size:13px;color:var(--ink-3);margin-top:3px;font-variant-numeric:tabular-nums}
+.svs{font-size:13px;color:var(--ink-3);word-break:break-word}
+.svs mark{background:none;color:var(--orange);border-bottom:2px solid var(--orange-2);padding:0 1px}
+.svs mark.k,.found mark{background:var(--hit);color:var(--ink);border:0;border-radius:3px;padding:0 4px;font-weight:600}
+.kk{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.kr{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:13px;padding:3px 8px;border-left:4px solid var(--kc);background:color-mix(in srgb,var(--kc) 9%,transparent);border-radius:0 5px 5px 0;color:var(--kc)}
+.kl{font-weight:600;white-space:nowrap}
+.ks{color:var(--kc);word-break:break-word}
+.kr .ks mark{color:var(--kc)}
+.c0{--kc:#2b5d9b}.c1{--kc:#7a3f9d}.c2{--kc:#1f7a74}.c3{--kc:#a3345f}.c4{--kc:#5b6b1f}.c5{--kc:#3f4fb0}.c6{--kc:#7a5230}.c7{--kc:#4a5a67}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .c0{--kc:#8fb6ea}:root:not([data-theme="light"]) .c1{--kc:#c89be4}:root:not([data-theme="light"]) .c2{--kc:#7fd0c8}:root:not([data-theme="light"]) .c3{--kc:#ec9ab9}:root:not([data-theme="light"]) .c4{--kc:#bfcf7a}:root:not([data-theme="light"]) .c5{--kc:#a3aef0}:root:not([data-theme="light"]) .c6{--kc:#d9ae86}:root:not([data-theme="light"]) .c7{--kc:#b3bec7}}
+.found{font-size:13px;margin-top:6px;color:var(--ink-2)}
+.found div{padding:1px 0}
+.bk.match{box-shadow:0 0 0 2px var(--hit)}
+.guide{font-size:13px;margin-top:8px;padding:6px 10px;border-radius:6px}
+.guide.link{background:var(--orange-bg);color:var(--orange)}
+.guide.warn{background:var(--brick-bg);color:var(--brick)}
+.guide.soft{background:var(--line-2);color:var(--ink-2)}
+.guide ul{margin:4px 0 0;padding-left:18px}
+
+.entry{margin:10px;align-self:start;border:1.5px solid var(--submit-line);background:var(--submit-bg);padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-radius:9px}
+.entry.s-gen{border-color:color-mix(in srgb,var(--field) 45%,transparent);background:color-mix(in srgb,var(--field) 6%,var(--card))}
+.entry.s-not{border-color:color-mix(in srgb,var(--brick) 45%,transparent);background:color-mix(in srgb,var(--brick) 6%,var(--card))}
+.elabel{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+.elabel span{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3);margin-left:6px}
+.entry .sbtn,.entry .rbtn{background:var(--card)}
+.entry.s-gen .elabel{color:var(--field)} .entry.s-not .elabel{color:var(--brick)}
+.seg{display:flex;gap:4px}
+.sbtn{flex:1;border:1px solid var(--line);background:var(--card);border-radius:7px;padding:7px 6px;cursor:pointer;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.sbtn:hover{border-color:var(--ink-3)}
+.rbtn{flex:0 0 auto;border:1px dashed var(--ink-3);background:none;border-radius:7px;padding:7px 10px;cursor:pointer;font-size:14px;color:var(--ink-2)}
+.rbtn:hover:not(:disabled){border-style:solid;color:var(--ink)}
+.rbtn:disabled{opacity:.35;cursor:default}
+.sbtn.on.gen{background:var(--field);border-color:var(--field);color:#fff}
+.sbtn.on.not{background:var(--brick);border-color:var(--brick);color:#fff}
+.entry input,.entry select{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:7px 10px;font-size:14px}
+.stat.ag b{color:var(--field)}
+.agbtn{display:block;margin-top:8px;border:1.5px solid var(--field);background:var(--field-bg);color:var(--field);border-radius:8px;padding:7px 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.agbtn.on{background:var(--field);color:#fff}
+.side{display:flex;flex-direction:column;min-width:0}
+.claim{margin:10px 10px 0;border-radius:9px;padding:9px 13px;border:1.5px solid;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.claim .ct{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;width:100%;opacity:.8}
+.claim b{font-size:16px}
+.claim small{font-size:12px;opacity:.8}
+.claim .cw{width:100%;font-size:13px;font-weight:600;margin-top:4px}
+.claim.cl{background:var(--field-bg);border-color:color-mix(in srgb,var(--field) 45%,transparent);color:var(--field)}
+.claim.pt{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber) 45%,transparent);color:var(--amber-ink,var(--amber))}
+.claim .cp{width:100%;font-size:13px}
+.claim.un{background:var(--brick-bg);border-color:color-mix(in srgb,var(--brick) 35%,transparent);color:var(--brick)}
+.info .claim{margin:10px 0 0}
+.entry select.need{border-color:var(--brick);border-width:2px}
+.needmsg{font-size:13px;color:var(--brick);margin-top:6px;font-weight:500}
+.entry.draft{border-style:dashed}
+.entry input:disabled{opacity:.55;cursor:not-allowed;background:var(--line-2)}
+.entry input.fid{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.use{font-size:13px;color:var(--orange)}
+.use button{border:1px solid var(--orange);background:none;color:var(--orange);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:4px}
+.stamp{font-size:12px;color:var(--ink-3)}
+.clear{background:none;border:0;color:var(--ink-3);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;align-self:flex-start}
+
+.more{display:block;margin:6px auto 30px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:9px 18px;cursor:pointer}
+.empty{padding:40px 0;text-align:center;color:var(--ink-3)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+dialog{border:0;border-radius:12px;padding:0;max-width:760px;width:calc(100% - 24px);max-height:86vh;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(20,26,31,.45)}
+.dlg{padding:18px 20px 22px}
+.dhead{display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--card);padding-bottom:6px}
+.dhead h2{font:600 20px/1.2 "IBM Plex Serif",Georgia,serif;margin:0;flex:1}
+.dclose{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:5px 12px;cursor:pointer}
+.dlg h3{font-size:15px;margin:18px 0 4px}
+.dlg p{margin:4px 0;color:var(--ink-2);font-size:14px;max-width:70ch}
+.mt{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;font-variant-numeric:tabular-nums}
+.mt th{text-align:left;font-weight:500;color:var(--ink-3);border-bottom:1px solid var(--line);padding:5px 6px}
+.mt td{border-bottom:1px solid var(--line-2);padding:5px 6px;vertical-align:top}
+.mt tr.flag td{background:var(--orange-bg)}
+.mtwrap{overflow-x:auto}
+details.cat{border-top:1px solid var(--line-2);padding:6px 0}
+details.cat summary{cursor:pointer;font-size:14px}
+.acct{font-size:14px;color:var(--ink-2)}
+.acct b{color:var(--ink)}
+.lk{font-size:14px;font-weight:600}.lk.on{color:var(--field)}
+.nm-l{margin-left:10px;font-size:14px;color:var(--ink-2)}
+.nm-i{border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:var(--card);width:170px;font-size:14px}
+.login{position:fixed;inset:0;z-index:50;background:rgba(20,26,31,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.login[hidden]{display:none}
+.lbox{width:100%;max-width:360px;background:var(--card);border:1px solid var(--card-line);border-radius:14px;padding:26px 24px;box-shadow:0 4px 24px rgba(20,30,40,.08)}
+.lbox h2{font:600 24px/1.2 "IBM Plex Serif",Georgia,serif;margin:0}
+.lsub{color:var(--ink-2);margin:4px 0 16px}
+.lbox label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px}
+.lbox input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card);font-size:16px}
+.lbtn{width:100%;margin-top:18px;border:0;background:var(--ink);color:var(--paper);border-radius:8px;padding:11px;font-weight:600;cursor:pointer}
+.lbtn:disabled{opacity:.5}
+.lview{display:block;margin:6px auto 0;background:none;border:0;color:var(--slate);text-decoration:underline;cursor:pointer;font-size:14px}
+.loginbtn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:6px 14px;font-weight:600;cursor:pointer;font-size:14px}
+.lerr{color:var(--brick);font-size:14px;min-height:1.2em;margin:10px 0 0}
+footer{color:var(--ink-3);font-size:13px;padding:10px 0 40px}
+@media (max-width:720px){
+  h1{font-size:22px} header{padding-top:18px}
+  .bk{grid-template-columns:1fr}
+  .entry{margin:0 10px 10px}
+  .group{padding:8px 6px 1px}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+<style>
+.stats{gap:10px 30px}
+.stat.p b{color:var(--ink-3)}
+.stat.id{padding-left:26px;border-left:1px solid var(--line)}
+.stat.id b{color:var(--slate)}
+.stat small{display:block;font-size:12px;color:var(--ink-3)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink-3);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.gmode{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 4px 10px}
+.gmode span{font-size:13px;color:var(--ink-2)}
+.mbtn{border:1px solid var(--orange);background:var(--card);color:var(--orange);border-radius:7px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+.mbtn.on{background:var(--orange);color:#fff}
+.gentry{background:var(--card);border:1px solid var(--orange);border-radius:10px;margin:0 0 10px;padding:12px 14px;display:grid;grid-template-columns:1fr minmax(280px,360px);gap:10px}
+.gentry .gsum{font-size:14px;color:var(--ink-2)}
+.gentry .gsum b{color:var(--ink)}
+.gentry .entry{margin:0}
+.bk.covered{grid-template-columns:1fr}
+.bk.covered .entry{display:none}
+.cov{font-size:13px;margin-top:8px;color:var(--orange)}
+.cov.g{color:var(--field)} .cov.n{color:var(--brick)}
+.nids{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+.nids select{width:auto}
+@media (max-width:720px){.gentry{grid-template-columns:1fr}.stat.id{padding-left:0;border-left:0}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>Farmer ID status by bucket<span id="vname"></span></h1>
+  <p class="sub" id="totals"></p>
+  <div class="meta">
+    <span class="acct" id="acct"></span>
+    <span class="sync" id="sync"><i></i><span></span></span>
+    <button class="dlbtn" id="dl-pdf" type="button">Download PDF</button>
+    <button class="dlbtn" id="dl-xls" type="button">Download Excel</button>
+    <button class="linkbtn" id="csv">Download all buckets (CSV)</button>
+    <button class="linkbtn" id="misc">Miscellaneous information</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="bigbar" id="bigbar"></div>
+  <div class="legend"><span><i style="background:var(--field)"></i>Buckets claimed</span><span><i style="background:var(--line)"></i>Buckets not claimed</span><span><i style="background:var(--orange)"></i>Check if same person in more than one bucket</span></div>
+</header>
+
+<div class="bar"><div class="wrap">
+  <div class="tools">
+    <div class="smode" role="group" aria-label="Search by">
+      <button data-m="khasra" aria-pressed="true">Khasra No.</button><button data-m="name" aria-pressed="false">Name</button>
+    </div>
+    <input class="search" id="q" type="search" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="qinfo" id="qinfo" aria-live="polite"></div>
+  <div class="chips" id="chips"></div>
+</div></div>
+
+<main class="wrap"><div id="list"></div></main>
+<footer class="wrap">Record for every bucket whether a Farmer ID has been generated. Buckets in an orange block appear to belong to one person: choose "One Farmer ID for all" to record them together, so they count as one Farmer ID. A red note means one bucket may hold more than one person. Nothing has been merged on the portal.</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="login" id="pinbox" hidden>
+  <form class="lbox" id="pform" autocomplete="off">
+    <h2>Enter PIN</h2>
+    <p class="lsub">Enter the PIN to make or change entries.</p>
+    <label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" required>
+    <button class="lbtn" id="pbtn" type="submit">Start editing</button>
+    <p class="lerr" id="perr" role="alert"></p>
+    <button type="button" class="lview" id="pcancel">Cancel – just view</button>
+  </form>
+</div>
+<dialog id="miscDlg" aria-labelledby="miscTitle"><div class="dlg">
+  <div class="dhead"><h2 id="miscTitle">Miscellaneous information</h2><button class="dclose" id="miscClose" aria-label="Close">Close</button></div>
+  <div id="miscBody"></div>
+</div></dialog>
+
+<script>
+const DATA = {"buckets":[{"id":1,"st":0,"v":[["imam uddin","mangta",1,["7"],["JK254431290439"],0.159345,0,[""],[""]]],"e":0.159345,"k":"3K-3M-0S","r":"","g":0,"u":"fa36ce5b-47fa-4ce0-8be1-57055a963f53"},{"id":2,"st":0,"v":[["mohammad ikbal","habib jo",2,["123/1","124/1"],["JK252097960280","JK251625172963"],0.03541,0,["",""],["",""]]],"e":0.03541,"k":"0K-14M-0S","r":"","g":0,"u":"f14f0555-dc65-434d-a939-eab38c2e7b84"},{"id":3,"st":0,"v":[["wali ulla shah","habib ulla shah",10,["15","46","109/23","11","103/21","111/27","33","107/29","26","49"],["JK218336633882","JK218751179315","JK218591647296","JK218408395915","JK263576737556","JK297733410764","JK298690226592","JK297433617359","JK298301737951","JK218895088189"],0.281384,0,["","","","","","","","","",""],["","","","","","","","","",""]]],"e":0.281384,"k":"5K-11M-2S","r":"","g":0,"u":"de84f956-0bf6-49d8-aa1c-345026aa2fad"},{"id":4,"st":0,"v":[["gulam nabi","mohammad jo",2,["124/1","123/1"],["JK251620226332","JK252095903539"],0.040469,0,["",""],["",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"ceaa3131-4aff-4b06-bf42-40f1a0437e1e"},{"id":5,"st":0,"v":[["aziz","gulam ahmad",2,["124/1","123/1"],["JK251622886351","JK252097384766"],0.040469,0,["",""],["",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"c9f2a879-994f-4a35-bc72-56ee422a0ae2"},{"id":6,"st":0,"v":[["zaahid hussain shah","raheem shah",2,["70/10","8"],["JK255231428034","JK254903325185"],0.313631,0,["",""],["",""]]],"e":0.313631,"k":"6K-4M-0S","r":"","g":0,"u":"c7d4cfe1-cd78-4b21-bdcc-c97ebb131807"},{"id":7,"st":0,"v":[["abdul rashid nabaaligh","akbar ali ba sarabarai habib ullah soteela chacha khuk batan seeri",4,["106/28","112/27","110/23","108/29"],["JK230410022488","JK229786103231","JK228945689348","JK230758019049"],0.068294,0,["","","",""],["","","",""]]],"e":0.068294,"k":"1K-7M-0S","r":"","g":0,"u":"ba17be09-0a0d-4d56-9a1e-f77a82d2d942"},{"id":8,"st":0,"v":[["masmat nazir fatima","mie ahmad",1,["71/10"],["JK223112226595"],0.053115,0,[""],[""]]],"e":0.053115,"k":"1K-1M-0S","r":"","g":0,"u":"b98d7b1c-20fb-4a39-8dca-b26af07746ea"},{"id":9,"st":0,"v":[["gulam hussain","wali ulla shah",2,["18","74/24"],["JK219596240741","JK220550959653"],0.257988,0,["",""],["",""]]],"e":0.257988,"k":"5K-2M-0S","r":"","g":0,"u":"b3e63528-8ee4-461c-954a-a12710f4ab3c"},{"id":10,"st":0,"v":[["irrigation dept","govt",3,["120/104/21","80/34","110/23"],["JK238501825754","JK238129853000","JK228984044315"],0.101172,0,["","",""],["","",""]]],"e":0.101172,"k":"2K-0M-0S","r":"","g":0,"u":"ae4ec105-894d-4c1d-bff2-171e13147a30"},{"id":11,"st":0,"v":[["noor haider shah","yakoob ali shah",1,["114/52"],["JK224384942715"],0.015176,0,[""],[""]]],"e":0.015176,"k":"0K-6M-0S","r":"","g":0,"u":"a96d7c45-5bbe-4765-bde3-b09140876015"},{"id":12,"st":0,"v":[["kala","gazi",1,["19"],["JK255875385707"],0.002529,0,[""],[""]]],"e":0.002529,"k":"0K-1M-0S","r":"","g":0,"u":"a8b0408b-e6c6-4daa-b290-d9f4c8681603"},{"id":13,"st":0,"v":[["gulam rasool","habib jo",2,["124/1","123/1"],["JK251623937963","JK252097863245"],0.037939,0,["",""],["",""]]],"e":0.037939,"k":"0K-15M-0S","r":"","g":0,"u":"a775ce64-b126-4209-953e-4cdc4f6f78bf"},{"id":14,"st":0,"v":[["yaameen shah","peer ali shah",1,["99/25"],["JK225704240052"],0.075879,0,[""],[""]]],"e":0.075879,"k":"1K-10M-0S","r":"","g":0,"u":"9f00bba8-81a0-4d25-8d47-48ee2c97cff2"},{"id":15,"st":0,"v":[["shamima fatima","makhdoom shah",1,["115/53"],["JK222324188878"],0.015854,0,[""],[""]]],"e":0.015854,"k":"0K-6M-2S","r":"","g":0,"u":"8f5f6b2f-1dce-4c1f-8d95-d6b24e29bc5a"},{"id":16,"st":0,"v":[["shahzad hussain shah","makhdoom shah",1,["115/53"],["JK222322201082"],0.079253,0,[""],[""]]],"e":0.079253,"k":"1K-11M-3S","r":"","g":0,"u":"890f0e97-a2fe-451e-97f1-a55c5bb28862"},{"id":17,"st":0,"v":[["mir ulla","gazi",1,["19"],["JK255875460068"],0.002529,0,[""],[""]]],"e":0.002529,"k":"0K-1M-0S","r":"","g":0,"u":"85c9416a-df82-40e7-96ca-249a62ce6b1b"},{"id":18,"st":0,"v":[["sarkar","SAKRAR",14,["66/62","67/62","61","93/54","60","65/62","64/62","63","55","94/54","122/69/62","121/69/62","59","68/62"],["JK262169519153","JK301598219111","JK301277270384","JK262448315802","JK262401288829","JK302158786163","JK301862009326","JK262042744908","JK264124570457","JK261872901220","JK261646037757","JK261504801230","JK301051996508","JK262303743403"],10.893641,0,["","","","","","","","","","","","","",""],["","","","","","","","","","","","","",""]]],"e":10.893641,"k":"215K-7M-0S","r":"Non-individual / possession entry","g":0,"u":"8305b729-b0ba-40fb-8927-d1d2419029f7"},{"id":19,"st":0,"v":[["nasar ulla shah","habib ulla shah",11,["11","105/28","107/29","33","109/23","111/27","103/21","49","26","15","46"],["JK218410126045","JK263753596477","JK297434679862","JK298691677606","JK218596353436","JK297742722808","JK263578748987","JK218896231352","JK298304077731","JK218340014267","JK218757363675"],0.271268,0,["","","","","","","","","","",""],["","","","","","","","","","",""]]],"e":0.271268,"k":"5K-7M-2S","r":"","g":0,"u":"7d1b5e29-436b-4ae1-bc3b-3bfd82ca83a4"},{"id":20,"st":0,"v":[["abdul rashid nadira baaligh","akbar ali",1,["113/52"],["JK235696446543"],0.005059,0,[""],[""]]],"e":0.005059,"k":"0K-2M-0S","r":"","g":0,"u":"7bcdb0ea-e715-4abb-a25c-4fcb06f1c3e7"},{"id":21,"st":2,"v":[["aziz ulla shah","habib ulla shah",10,["46","11","15","103/21","111/27","33","107/29","26","49","109/23"],["JK218753986925","JK218408494712","JK218337078924","JK263578103314","JK297738084544","JK298691287967","JK297434077256","JK298301978916","JK218895371313","JK218594961516"],0.278855,0,["","","","","","","","","",""],["","","","","","","","","",""]],["pir aziz ulla shah","habib ulla shah",2,["51","20"],["JK221484583522","JK221145526742"],0.149228,2,["",""],["",""]]],"e":0.428083,"k":"8K-9M-2S","r":"","g":0,"u":"78b43c77-07d5-4966-9a02-cdbc02a6f39a"},{"id":22,"st":0,"v":[["ali zaman","abd ulla",2,["5","45"],["JK299498566535","JK299209069508"],0.042997,0,["",""],["",""]]],"e":0.042997,"k":"0K-17M-0S","r":"","g":0,"u":"7521ab7c-71b1-4d56-8001-2f8f425aa397"},{"id":23,"st":0,"v":[["arif hussain shah","makhdoom shah",1,["115/53"],["JK222323116657"],0.079253,0,[""],[""]]],"e":0.079253,"k":"1K-11M-3S","r":"","g":0,"u":"71484c06-5ff2-4fe3-8387-6196e9403d13"},{"id":24,"st":0,"v":[["masmat atika","habib jo",2,["124/1","123/1"],["JK251626600818","JK252100129353"],0.03541,0,["",""],["",""]]],"e":0.03541,"k":"0K-14M-0S","r":"","g":0,"u":"6cbf80b0-4786-49f7-bc0e-24afa5d626b4"},{"id":25,"st":0,"v":[["makhdoom shah","pir ahmad shah",1,["116/53"],["JK249873253130"],0.237753,0,[""],[""]]],"e":0.237753,"k":"4K-14M-0S","r":"","g":0,"u":"6ab1c643-7fea-498c-aa1d-c666aaa9807f"},{"id":26,"st":0,"v":[["gulam hasan","gulam ahmad",2,["124/1","123/1"],["JK251627529283","JK252102635992"],0.03541,0,["",""],["",""]]],"e":0.03541,"k":"0K-14M-0S","r":"","g":0,"u":"65b693a3-0726-460e-bcdc-79cdafef98af"},{"id":27,"st":0,"v":[["masmat shyamali","wali jo",2,["124/1","123/1"],["JK251623443903","JK252097783902"],0.040469,0,["",""],["",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"64c62ea7-2610-42dc-af34-6f94ce39f455"},{"id":28,"st":0,"v":[["shamim hussain shah","mehmood shah",1,["73/24"],["JK224914522070"],0.042998,0,[""],[""]]],"e":0.042998,"k":"0K-17M-0S","r":"","g":0,"u":"60353b22-062c-46f0-8997-2a19aeaa6195"},{"id":29,"st":0,"v":[["abdul rasheed","gulam ahmad",2,["123/1","124/1"],["JK252100564025","JK251627038875"],0.040469,0,["",""],["",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"5f8fe3a2-e13b-47a7-855c-acab069150ae"},{"id":30,"st":0,"v":[["karamat ulla","sher mohammad",3,["2","3","4"],["JK252507314068","JK253940493149","JK252718535483"],0.318691,0,["","",""],["","",""]]],"e":0.318691,"k":"6K-6M-0S","r":"","g":0,"u":"5ed07a93-ae5a-4235-aca2-67092455aeb2"},{"id":31,"st":0,"v":[["nusrat fatima","makhdoom shah",1,["115/53"],["JK222325227522"],0.015854,0,[""],[""]]],"e":0.015854,"k":"0K-6M-2S","r":"","g":0,"u":"584ae698-0a9e-46ba-93f0-54b3ff36fa93"},{"id":32,"st":0,"v":[["kala baaligh","akbar ali ba sarabarai habib ullah soteela chacha khuk batan seeri",4,["110/23","112/27","106/28","108/29"],["JK228942906983","JK229783871452","JK230408860348","JK230757769826"],0.070817,0,["","","",""],["","","",""]]],"e":0.070817,"k":"1K-8M-0S","r":"","g":0,"u":"52e75ee2-92d9-4408-b984-ac2defd190b7"},{"id":33,"st":0,"v":[["mir ahmad shah","habib ulla shah",10,["111/27","15","46","103/21","11","109/23","49","26","107/29","33"],["JK297741094540","JK218338603768","JK218754851309","JK263578735581","JK218408913729","JK218596137547","JK218895557511","JK298302269595","JK297434307385","JK298691641772"],0.271267,0,["","","","","","","","","",""],["","","","","","","","","",""]]],"e":0.271267,"k":"5K-7M-2S","r":"","g":0,"u":"4bf9cf99-c784-47a1-b3a9-95a7adde8027"},{"id":34,"st":0,"v":[["qasim ali shah","sayed ali shah",1,["75/22"],["JK225386469406"],0.083466,0,[""],[""]]],"e":0.083466,"k":"1K-13M-0S","r":"","g":0,"u":"4ad8f684-fddf-472d-8537-dd0493585722"},{"id":35,"st":0,"v":[["mahsooma fatima","makhdoom shah",1,["115/53"],["JK222324243549"],0.015854,0,[""],[""]]],"e":0.015854,"k":"0K-6M-2S","r":"","g":0,"u":"3c84c24d-5156-4946-a8b7-7e8f299d95b2"},{"id":36,"st":0,"v":[["kala baaligh","akbar ali",8,["76/22","113/52","0115/53","117/56","30","48","119/104/21","79/34"],["JK239254418612","JK235696030593","JK248432936021","JK248909656626","JK236767327571","JK236230246621","JK238884590287","JK237374913712"],0.5008,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.5008,"k":"9K-18M-0S","r":"","g":0,"u":"370e4865-e6d2-4adc-ae67-0bf0affbbf3a"},{"id":37,"st":0,"v":[["shamlat dh","shamliat",24,["86/42","89/40","91/41","57","58","50","82/42","88/42","102/83/42","13","85/42","31","37","39","32","38","90/40","101/83/42","12","92/41","36","43","84/42","87/42"],["JK258999660193","JK260370539518","JK260539715562","JK260645702129","JK261226310601","JK261262827464","JK256257091338","JK256493805620","JK256666622161","JK256884450135","JK257276093330","JK258061171777","JK258446252662","JK258605429912","JK298405042550","JK300736407067","JK263816153714","JK259232807542","JK259453110045","JK259606196931","JK259838017917","JK259996265384","JK260122786409","JK260249930726"],4.982697,0,["","","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","","",""]]],"e":4.982697,"k":"98K-10M-0S","r":"","g":0,"u":"2d4dca12-5630-45d7-a40c-4a414e4a856f"},{"id":38,"st":2,"v":[["makbool hussain shah va mir hussain shah","rasool shah",1,["35"],["JK250351554316"],0.149228,0,[""],[""]],["mir hussain shah","rasool shah",1,["35"],["JK250357494166"],0.149228,2,[""],[""]]],"e":0.298456,"k":"5K-18M-0S","r":"","g":0,"u":"2a257a27-f388-417e-b198-ede2259e6712"},{"id":39,"st":0,"v":[["abdul majeed","gulam ahmad",2,["123/1","124/1"],["JK252096666171","JK251621245493"],0.040469,0,["",""],["",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"23f3a871-d760-4113-aa09-608aa7ca59fe"},{"id":40,"st":0,"v":[["bi bi shamim","makhdoom shah",1,["115/53"],["JK222325469759"],0.015831,0,[""],[""]]],"e":0.015831,"k":"0K-6M-2S","r":"","g":0,"u":"2200e42f-8925-4bf0-b9b3-0049816b12f0"},{"id":41,"st":2,"v":[["kamar ali dhoo nd","sher ali dhund",3,["117/56","0115/53","113/52"],["JK248910268444","JK248435579614","JK235697813262"],0.055644,0,["","",""],["","",""]],["kamar ali","sher ali",2,["30","48"],["JK236768581272","JK236232660092"],0.108759,2,["",""],["",""]],["va kamar ali","sher ali",2,["119/104/21","76/22"],["JK238884617587","JK239259276657"],0.078408,3,["",""],["",""]]],"e":0.242811,"k":"4K-16M-0S","r":"","g":0,"u":"167f5444-a163-4097-adb7-e15682f5070a"},{"id":42,"st":0,"v":[["masmat nazir fatima","mir ahmad",1,["47"],["JK223970966559"],0.022764,0,[""],[""]]],"e":0.022764,"k":"0K-9M-0S","r":"","g":0,"u":"15f4f813-9194-4c4b-80e2-1bb9605bc04d"},{"id":43,"st":0,"v":[["afazal un nisa","makhdoom shah",1,["115/53"],["JK222323486165"],0.015854,0,[""],[""]]],"e":0.015854,"k":"0K-6M-2S","r":"","g":0,"u":"0f4101c0-b272-411f-a008-e0705d09e277"},{"id":44,"st":2,"v":[["hidayat ulla","rahmat ulla",10,["6","0115/53","17","117/56","9","113/52","44","14","100/25","16"],["JK233184851940","JK248429126294","JK231487673010","JK248909425919","JK232411448127","JK235694558401","JK232784248488","JK297944815908","JK234563497674","JK233773407160"],0.983893,0,["","","","","","","","","",""],["","","","","","","","","",""]],["hidayat ulla","rahmat ulla madraja khewat no13",2,["45","5"],["JK299208666660","JK299498487790"],0.042997,2,["",""],["",""]]],"e":1.02689,"k":"20K-6M-0S","r":"","g":0,"u":"0f3186e1-d24b-4f9c-b3ca-932910aebfd9"},{"id":45,"st":0,"v":[["miraj alnsau","wali ulla shah",1,["118/56"],["JK220813571836"],0.055644,0,[""],[""]]],"e":0.055644,"k":"1K-2M-0S","r":"","g":0,"u":"0df1104a-e209-40e8-8070-94da4617e8b0"},{"id":46,"st":0,"v":[["mohammad zaman","abd ulla",2,["45","5"],["JK299209297836","JK299499337409"],0.037939,0,["",""],["",""]]],"e":0.037939,"k":"0K-15M-0S","r":"","g":0,"u":"0dccea75-c31e-46f2-8703-bf12e7ee3a80"},{"id":47,"st":0,"v":[["abdul ahad","habib jo",2,["123/1","124/1"],["JK252099237768","JK251626550178"],0.03541,0,["",""],["",""]]],"e":0.03541,"k":"0K-14M-0S","r":"","g":0,"u":"0914b0af-a43d-445e-8f08-7e247914a669"},{"id":48,"st":0,"v":[["hussain fatima","mir ahmad",2,["71/10","47"],["JK223112772289","JK223971253404"],0.075879,0,["",""],["",""]]],"e":0.075879,"k":"1K-10M-0S","r":"","g":0,"u":"08753e44-9f9f-4139-b23e-b46dcba6541f"}],"groups":[],"plots":173,"ext":21.86064,"kms":"432K-3M-0S","extra":[],"mismatch":[],"khewats":0,"khatas":0,"agriPlots":173,"noAgri":true};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const BY=new Map(DATA.buckets.map(b=>[b.id,b]));
+const UIDS=new Map(DATA.buckets.map(b=>[String(b.u??b.id),b.id]));      // real bucket ID (as saved in the sheet) → number on this page
+const idOf=v=>UIDS.get(String(v).trim());
+const GR=new Map(DATA.groups.map(g=>[g.id,g]));
+const STATUS={gen:'Generated',not:'Not generated'};
+const plotsOf=b=>b.v.reduce((a,v)=>a+v[2],0);
+const kmsP=k=>k.replace(/K-/,' K ').replace(/M-/,' M ').replace(/S$/,' S');
+const STORE='farmerIdByBucket:'+VILLAGE+(DATA.buckets[0]&&DATA.buckets[0].u?':'+DATA.buckets.length+':'+DATA.buckets[0].u:'');
+const dropRemark=r=>(r||'').split('; ').filter(x=>x&&!/survey no/i.test(x)).join('; ');
+
+/* E: 'B<id>' -> bucket entry {s,fid,reason,note,n,shared,by,at,synced}; 'G<id>' -> {mode:'one'|'sep'} */
+let E={};
+try{E=JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){}
+const persist=()=>{try{localStorage.setItem(STORE,JSON.stringify(E))}catch(e){}};
+const ent=id=>E['B'+id]||{};
+const gmode=gid=>E['G'+gid]?.mode||'sep';
+
+$('#vname').textContent=VILLAGE?' – '+VILLAGE:'';
+document.title='Farmer ID status by bucket'+$('#vname').textContent;
+$('#totals').textContent=`${DATA.buckets.length} buckets, ${DATA.plots.toLocaleString()} plots, ${DATA.ext.toFixed(2)} ha (${kmsP(DATA.kms)})`;
+
+/* ---------- counting: buckets vs Farmer IDs ---------- */
+function counts(){
+  let gen=0,not=0; const units=new Map();
+  for(const b of DATA.buckets){
+    const e=ent(b.id);
+    if(e.s==='not') not++;
+    if(e.s!=='gen') continue;
+    gen++;
+    const fid=(e.fid||'').trim().toUpperCase();
+    const key=fid?'F'+fid:(e.shared?'G'+e.shared:'B'+b.id);
+    const u=units.get(key)||{b:0,n:0}; u.b++; u.n=Math.max(u.n,e.shared?1:(+e.n||1)); units.set(key,u);
+  }
+  let ids=0,sharedB=0,sharedU=0,splitB=0,splitIds=0;
+  for(const u of units.values()){ ids+=u.n; if(u.b>1){sharedB+=u.b;sharedU++;} else if(u.n>1){splitB++;splitIds+=u.n;} }
+  return {T:DATA.buckets.length,gen,not,open:DATA.buckets.length-gen-not,ids,sharedB,sharedU,splitB,splitIds};
+}
+function renderChips(){$('#chips').innerHTML=FILTERS.map(([k,l,fn])=>`<button class="chip" data-f="${k}" aria-pressed="${filter===k}">${l}<em>${DATA.buckets.filter(fn).length}</em></button>`).join('');}
+function stats(){
+  renderChips();
+  const c=counts(), pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
+  const notClaimed=c.T-c.gen;                       // simple rule: total − claimed
+  const diff=c.gen-c.ids;                           // buckets absorbed because one ID covers several buckets
+  $('#stats').innerHTML=`<div class="stat"><b>${c.T}</b><span>total buckets</span></div>
+    <div class="stat g"><b>${c.gen}</b><span>buckets claimed</span></div>
+    <div class="stat n"><b>${notClaimed}</b><span>buckets not claimed</span><small>total − claimed</small></div>
+    <div class="stat id"><b>${c.ids}</b><span>Farmer IDs generated</span><small>${c.gen?(diff>0?`${pl(c.gen,'bucket')} claimed by ${pl(c.ids,'ID')}: difference ${diff}, as ${pl(c.sharedB,'bucket')} share ${pl(c.sharedU,'ID')}`:`one ID per claimed bucket`):'&nbsp;'}</small></div>`;
+  if(CLAIM){ const u=DATA.buckets.filter(b=>CLAIM.un.has(b.id)).length, p=DATA.buckets.filter(b=>CLAIM.part.has(b.id)).length;
+    $('#stats').insertAdjacentHTML('beforeend',`<div class="stat ag"><b>${c.T-u}</b><span>buckets claimed in AgriStack</span><small>${c.T-u-p} fully${p?` + ${p} partly`:''} · ${u} unclaimed · report of ${esc(CLAIM.date)}</small>
+      <button class="agbtn ${filter==='agc'?'on':''}" id="agbtn" type="button">${filter==='agc'?'Show all buckets':`Show claimed &amp; partly claimed (${c.T-u})`}</button></div>`); }
+  $('#bigbar').innerHTML=`<i style="width:${c.gen*100/c.T}%;background:var(--field)"></i>`;
+}
+/* ---------- read-only guidance ---------- */
+function guidance(b,inGroup){
+  const out=[];
+  if(b.g&&!inGroup){const g=GR.get(b.g);out.push(`<div class="guide link">Check if same person as bucket ${g.b.filter(x=>x!==b.id).join(', ')}?</div>`);}
+  if(b.st===3) out.push(`<div class="guide warn">This bucket may hold more than one person. Plots are recorded as:<ul>${b.v.map(v=>`<li>${esc(v[0])} / ${esc(v[1])} (${v[2]} plot${v[2]>1?'s':''})</li>`).join('')}</ul>Check before marking the whole bucket.</div>`);
+  else if(b.st>0) out.push(`<div class="guide soft">Also written as ${b.v.slice(1).map(v=>esc(v[0])+' / '+esc(v[1])).join('; ')}. Same person, written differently.</div>`);
+  const r=dropRemark(b.r); if(r) out.push(`<div class="guide soft">${esc(r)}</div>`);
+  return out.join('');
+}
+function stampText(e){return e.s?`${esc(e.by||'')}${e.at?', '+new Date(e.at).toLocaleString([],{dateStyle:'medium',timeStyle:'short'}):''}${!e.synced&&APPS_SCRIPT_URL?' – not yet saved':''}`:''}
+function linkedIdHint(b){
+  if(!b.g) return '';
+  const mine=(ent(b.id).fid||'').trim();
+  const ids=GR.get(b.g).b.filter(x=>x!==b.id).map(x=>[x,(ent(x).fid||'').trim()]).filter(([,f])=>f);
+  if(!ids.length) return '';
+  const f=ids[0][1];
+  if(mine&&mine!==f) return `<div class="use" style="color:var(--brick)">Bucket ${ids[0][0]} has a different ID: ${esc(f)}</div>`;
+  if(mine===f) return '';
+  return `<div class="use">Bucket ${ids[0][0]} has ID ${esc(f)}<button data-use="${esc(f)}">Use same ID</button></div>`;
+}
+
+/* entry panel: target is 'B<id>' (one bucket) or 'G<id>' (one ID for a whole group) */
+/* REASON_BEFORE_SAVE: pressing "Not generated" records nothing by itself. The entry is made, counted and
+   saved only when a reason is chosen. Until then the box is a draft kept on this screen only. */
+const DRAFT=new Set();
+function entryPanel(target,e,opts={}){
+  const draft=DRAFT.has(target), s=draft?'not':(e.s||'');
+  if(draft) e={...e,reason:'',note:'',_was:e.s};
+  const need=s==='not'&&!e.reason;
+  return `<div class="entry ${s?'s-'+s:''} ${draft?'draft':''}" data-t="${target}">
+    <div class="elabel">Farmer ID status <span>${draft?'not recorded yet':s?'recorded':'enter here'}</span></div>
+    <div class="seg" role="group" aria-label="Farmer ID status">
+      <button class="sbtn gen ${s==='gen'?'on':''}" data-s="gen" aria-pressed="${s==='gen'}">Generated</button>
+      <button class="sbtn not ${s==='not'?'on':''}" data-s="not" aria-pressed="${s==='not'}">Not generated</button>
+      <button class="rbtn" data-reset="1" ${s||e.fid||e.note||e.reason?'':'disabled'} title="Remove this entry">Reset</button>
+    </div>
+    ${s==='not'?`<select data-f="reason" required class="${need?'need':''}"><option value="">Select reason…</option>${REASONS.map(r=>`<option ${e.reason===r?'selected':''}>${esc(r)}</option>`).join('')}${e.reason&&!REASONS.includes(e.reason)?`<option value="${esc(e.reason)}" selected>${esc(e.reason)} (no longer on the list)</option>`:''}</select>`:''}
+    ${s==='not'?`<input data-f="note" ${e.reason?'':'disabled'} placeholder="${e.reason?'Remarks (optional)':'Remarks – select a reason first'}" value="${esc(e.note||'')}">`:''}
+    ${need?`<div class="needmsg">${draft?'Choose a reason. The entry is recorded only after a reason is chosen.':'Reason missing. Choose a reason for this entry.'}</div>`:''}
+    <div class="stamp">${draft?(e._was==='gen'?'Still recorded as Generated until a reason is chosen.':''):stampText(e)}</div>
+  </div>`;
+}
+/* CLAIM_STATUS: AgriStack claimed / unclaimed, shown only after the admin uploads the village's unclaimed-buckets report */
+let CLAIM=null;
+function setClaim(c){
+  if(!c||!Array.isArray(c.unclaimed)){ CLAIM=null; return; }
+  const part=new Map(); Object.keys(c.partly||{}).forEach(k=>{ const id=idOf(k); if(id!==undefined) part.set(id,c.partly[k]); });
+  CLAIM={date:String(c.report||'').split(' · ')[0],un:new Set(c.unclaimed.map(idOf).filter(x=>x!==undefined)),part};
+  if(!FILTERS.some(f=>f[0]==='unc')) FILTERS.push(
+    ['unc','Unclaimed in AgriStack',b=>!!CLAIM&&CLAIM.un.has(b.id)],
+    ['pcl','Partly claimed',b=>!!CLAIM&&CLAIM.part.has(b.id)],
+    ['agc','Claimed + partly claimed',b=>!!CLAIM&&!CLAIM.un.has(b.id)],
+    ['clm','Claimed in AgriStack',b=>!!CLAIM&&!CLAIM.un.has(b.id)&&!CLAIM.part.has(b.id)],
+    ['gunc','Generated here, unclaimed in AgriStack',b=>!!CLAIM&&CLAIM.un.has(b.id)&&ent(b.id).s==='gen']);
+}
+function claimBox(b,e){
+  if(!CLAIM) return '';
+  const un=CLAIM.un.has(b.id), pt=CLAIM.part.get(b.id);
+  const warn=un&&e.s==='gen'?'Recorded here as Generated, but this report still shows it unclaimed.':!un&&e.s==='not'?`Recorded here as Not generated, but AgriStack shows it ${pt?'partly ':''}claimed.`:'';
+  return `<div class="claim ${un?'un':pt?'pt':'cl'}"><span class="ct">AgriStack status</span><b>${un?'Unclaimed':pt?'Partly claimed':'Claimed'}</b><small>as per the report of ${esc(CLAIM.date)}</small>${warn?`<div class="cw">${warn}</div>`:''}</div>`;
+}
+function card(b,group){
+  const e=ent(b.id), covered=group&&gmode(group.id)==='one';
+  const cs=group?group.cs:[];
+  const kh=PLOTMODE[mode]?(KHITS.get(b.id)||[]):[];
+  const khs=new Set(kh.map(h=>h.sv));
+  const pm=new Map();
+  b.v.forEach(v=>v[3].forEach((s,i)=>{const k=v[7][i]+'|'+v[8][i]; if(!pm.has(k)) pm.set(k,{kw:v[7][i],kt:v[8][i],sv:[]}); const p=pm.get(k); if(!p.sv.includes(s)) p.sv.push(s);}));
+  const pairs=[...pm.values()].sort((x,y)=>(parseFloat(x.kw)||0)-(parseFloat(y.kw)||0)||(parseFloat(x.kt)||0)-(parseFloat(y.kt)||0));
+  const cov=covered?(e.s==='gen'?`<div class="cov g">Covered by the group's Farmer ID</div>`:e.s==='not'?`<div class="cov n">Not generated (group entry)</div>`:`<div class="cov">Recorded with the group entry above</div>`):'';
+  return `<article class="bk ${e.s?'filled':''} ${covered?'covered':''} ${kh.length?'match':''}" id="b${b.id}">
+    <div class="info">
+      <div class="top"><span class="bid">Bucket ${b.id}</span><span class="nm">${esc(b.v[0][0])}</span></div>
+      <div class="par">${esc(b.v[0][1])}</div>${b.u?`<div class="uid">AgriStack bucket ID ${esc(b.u)}</div>`:''}
+      <div class="kk">${pairs.map((p,n)=>`<div class="kr c${n%8}"><span class="kl">${p.kw===''&&DATA.noAgri?'Survey nos.':`Khewat ${esc(p.kw)}, Khata ${esc(p.kt)}`}</span><span class="ks">${p.sv.map(x=>khs.has(x)?`<mark class="k">${esc(x)}</mark>`:cs.includes(x)?`<mark title="Shared with the other buckets of this person">${esc(x)}</mark>`:esc(x)).join(', ')}</span></div>`).join('')}</div>
+      ${guidance(b,!!group)}${cov}${covered?claimBox(b,e):''}
+    </div>
+    ${covered?'':`<div class="side">${claimBox(b,e)}${entryPanel('B'+b.id,e,{hint:b.g?linkedIdHint(b):undefined,multi:b.st===3?b.v.length:0})}</div>`}
+  </article>`;
+}
+function groupEntry(g){
+  const e=ent(g.b[0]);
+  return `<div class="gentry">
+    <div class="gsum"><b>One Farmer ID for buckets ${g.b.join(', ')}</b><br>Counts as 1 Farmer ID and ${g.b.length} buckets.</div>
+    ${entryPanel('G'+g.id,e)}
+  </div>`;
+}
+function groupBlock(g,visible){
+  const mode=gmode(g.id);
+  const ids=g.b.map(x=>(ent(x).fid||'').trim()).filter(Boolean), clash=mode==='sep'&&new Set(ids).size>1;
+  return `<section class="group ${g.c==='Medium'?'med':''}" id="g${g.id}">
+    <div class="ghead"><b>Check if same person</b> in buckets ${g.b.join(', ')}?${g.cs.length?` They share khasra ${g.cs.map(esc).join(', ')}.`:''}${g.c==='Medium'?' Spelling differs.':''}</div>
+    <div class="gmode" role="group" aria-label="How was the Farmer ID generated"><span>Farmer ID:</span>
+      <button class="mbtn ${mode==='one'?'on':''}" data-mode="one" data-g="${g.id}" aria-pressed="${mode==='one'}">One Farmer ID for all ${g.b.length}</button>
+      <button class="mbtn ${mode==='sep'?'on':''}" data-mode="sep" data-g="${g.id}" aria-pressed="${mode==='sep'}">Record each bucket separately</button></div>
+    ${clash?`<div class="warnline">Different Farmer IDs entered for these buckets. Check whether they are really one person.</div>`:''}
+    ${mode==='one'?groupEntry(g):''}
+    ${visible.map(b=>card(b,g)).join('')}
+  </section>`;
+}
+
+/* ---------- list ---------- */
+let filter='all', q='', mode='khasra', shown=60;
+const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+const NAMETXT=new Map(DATA.buckets.map(b=>[b.id,norm(b.v.map(v=>v[0]+' '+v[1]).join(' ')+(b.u?' '+b.u:''))]));
+/* ---- khasra search ----
+   Khasra numbers are written many ways: "643/151", "643 / 151", "30 alif", "24min".
+   Typing 643 finds 643 and every 643/... ; typing 151 also finds .../151 ; typing 643/151 finds exactly that.
+   Several numbers can be entered at once, separated by commas. */
+const kn=s=>String(s).toLowerCase().replace(/\s*[\/\\-]\s*/g,'/').replace(/\s+/g,' ').trim();
+function kScore(sv,k){
+  const s=kn(sv); if(s===k) return 4;
+  const segs=s.split('/'), head=segs[0].split(' ')[0];
+  if(segs[0]===k||head===k) return 3;
+  if(k.includes('/')&&s.startsWith(k)) return 2;
+  if(segs.some(x=>x===k||x.split(' ')[0]===k)) return 1;
+  return 0;
+}
+const ALT=new Map(DATA.mismatch.map(r=>[r[5],r[2]]));   // khasra as written in AgriStack where it differs
+const PLOTMODE={khasra:'Khasra'};
+let KQ=[], KHITS=new Map();     // bucket id -> [{sv,kw,kt,pl,owner,score}]
+function computeKhasra(){
+  KHITS=new Map(); KQ=q?q.split(/[,;]+/).map(kn).filter(Boolean):[];
+  if(!KQ.length) return;
+  const score=(sv,kw,kt,pl)=>mode==='khasra'?Math.max(...KQ.map(k=>Math.max(kScore(sv,k),ALT.has(pl)?kScore(ALT.get(pl),k):0))):
+                         Math.max(...KQ.map(k=>kn(mode==='khewat'?kw:kt)===k?4:0));
+  for(const b of DATA.buckets){
+    const hits=[];
+    for(const v of b.v) v[3].forEach((sv,i)=>{const kw=v[7][i],kt=v[8][i],sc=score(sv,kw,kt,v[4][i]); if(sc) hits.push({sv,kw,kt,pl:v[4][i],owner:v[0],score:sc});});
+    if(hits.length) KHITS.set(b.id,hits.sort((a,b)=>b.score-a.score));
+  }
+}
+function hit(b){
+  if(!q) return true;
+  if(PLOTMODE[mode]) return KHITS.has(b.id);
+  if(mode==='bucket') return q.split(/[,;\s]+/).filter(Boolean).some(x=>String(b.id)===x.replace(/\D/g,''));
+  const nq=norm(q); return NAMETXT.get(b.id).includes(nq)||norm(ent(b.id).fid||'').includes(nq);
+}
+const bestScore=b=>PLOTMODE[mode]&&KHITS.has(b.id)?KHITS.get(b.id)[0].score:0;
+const PH={khasra:'Khasra No., e.g. 643/151',khewat:'Khewat No., e.g. 98',khata:'Khata No., e.g. 175',name:'Name or parentage',bucket:'Bucket ID, e.g. 336'};
+const FILTERS=[
+  ['all','All',b=>true],
+  ['open','Not yet filled',b=>!ent(b.id).s],
+  ['gen','Generated',b=>ent(b.id).s==='gen'],
+  ['not','Not generated',b=>ent(b.id).s==='not'],
+  ['nor','Not generated, no reason',b=>ent(b.id).s==='not'&&!ent(b.id).reason],
+  ['linked','Check if same person',b=>!!b.g],
+  ['mixed','May hold more than one person',b=>b.st===3],
+];
+const UNITS=[]; {const seen=new Set();
+  for(const b of DATA.buckets){ if(seen.has(b.id)) continue;
+    if(b.g){const g=GR.get(b.g); g.b.forEach(x=>seen.add(x)); UNITS.push({g,bs:g.b.map(x=>BY.get(x))});}
+    else{seen.add(b.id); UNITS.push({bs:[b]});}}}
+
+function render(){
+  const f=FILTERS.find(x=>x[0]===filter)[2];
+  if(PLOTMODE[mode]) computeKhasra();
+  let n=0, total=0, html='';
+  let list=UNITS;
+  if(filter==='agc'&&CLAIM){                             // fully claimed first, then partly claimed
+    const rank=u=>u.bs.some(b=>!CLAIM.un.has(b.id)&&!CLAIM.part.has(b.id))?0:1;
+    list=UNITS.map((u,i)=>[u,rank(u),i]).sort((a,b)=>a[1]-b[1]||a[2]-b[2]).map(x=>x[0]);
+  }
+  if(q&&PLOTMODE[mode]) list=UNITS.map((u,i)=>[u,Math.max(...u.bs.map(bestScore)),i]).sort((a,b)=>b[1]-a[1]||a[2]-b[2]).map(x=>x[0]);
+  for(const u of list){
+    const vis=u.bs.filter(b=>f(b)&&hit(b)); if(!vis.length) continue;
+    total+=u.bs.length; if(n>=shown) continue;
+    html+=u.g?groupBlock(u.g,u.bs):card(u.bs[0],null);   // a group always shows all its buckets together
+    n+=u.bs.length;
+  }
+  if(total>n) html+=`<button class="more" id="more">Show more</button>`;
+  $('#list').innerHTML=html||`<p class="empty">${q&&PLOTMODE[mode]?`No plot with ${PLOTMODE[mode].toLowerCase()} ${esc(q)}${filter!=='all'?' under this filter':''}.${mode==='khasra'?' Try only the first part of the number, e.g. 643 for 643/151.':' It may be common or government land, see Miscellaneous information.'}`:'Nothing matches. Clear the search or pick another filter.'}</p>`;
+  let info='';
+  if(q&&PLOTMODE[mode]&&KHITS.size){
+    const plots=[...KHITS.values()].reduce((a,h)=>a+h.length,0);
+    info=`${PLOTMODE[mode]} <b>${esc(q)}</b>: ${plots} plot${plots>1?'s':''} in ${KHITS.size} bucket${KHITS.size>1?'s':''}.${mode==='khasra'?' Exact matches are shown first.':''}`;
+  }
+  $('#qinfo').innerHTML=info;
+  stats();
+}
+
+$('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip'); if(!c) return; filter=c.dataset.f; shown=60; render();});
+document.addEventListener('click',e=>{ if(e.target.id!=='agbtn') return; filter=filter==='agc'?'all':'agc'; shown=60; render(); $('#chips').scrollIntoView({behavior:'smooth',block:'start'}); });
+let qt; $('#q').addEventListener('input',e=>{clearTimeout(qt); qt=setTimeout(()=>{q=e.target.value.trim(); shown=60; render(); window.scrollTo({top:Math.min(window.scrollY,$('header').offsetHeight)});},200)});
+function setMode(m){mode=m; document.querySelectorAll('.smode button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
+  $('#q').placeholder=PH[m]; $('#q').setAttribute('inputmode',m==='khasra'||m==='name'?'text':'numeric'); shown=60; render(); $('#q').focus();}
+document.querySelector('.smode').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) setMode(b.dataset.m);});
+$('#q').placeholder=PH.khasra;
+
+/* ---------- editing ---------- */
+function who(){ if(APPS_SCRIPT_URL&&!PIN){ askPin(); return ''; } return SESSION.username; }
+function targets(t){ // bucket ids affected by an entry panel
+  if(t[0]==='G'){const g=GR.get(+t.slice(1)); return g.b.map(id=>({id,shared:g.id}));}
+  return [{id:+t.slice(1),shared:0}];
+}
+function apply(t,patch){
+  const w=who(); if(!w) return false;
+  for(const {id,shared} of targets(t)){
+    E['B'+id]={...ent(id),...patch,shared:shared||0,by:w,at:Date.now(),synced:false};
+    queue(id);
+  }
+  persist(); return true;
+}
+$('#list').addEventListener('click',e=>{
+  if(e.target.id==='more'){shown+=60; render(); return;}
+  const mb=e.target.closest('.mbtn');
+  if(mb){ const gid=+mb.dataset.g, mode=mb.dataset.mode, g=GR.get(gid);
+    if(gmode(gid)===mode) return; if(!who()) return; DRAFT.clear();
+    if(mode==='one'){
+      const filled=g.b.map(ent).filter(x=>x.s);
+      const differ=new Set(filled.map(x=>x.s+'|'+(x.fid||'')+'|'+(x.reason||''))).size>1;
+      if(differ&&!confirm('These buckets have different entries. Use the first filled bucket\'s entry for all of them?')) return;
+      E['G'+gid]={mode:'one'};
+      const base=filled[0]; if(base) apply('G'+gid,{s:base.s,fid:base.fid||'',reason:base.reason||'',note:base.note||'',n:1});
+      else g.b.forEach(id=>{E['B'+id]={...ent(id),shared:gid}; });
+    }else{
+      E['G'+gid]={mode:'sep'};
+      g.b.forEach(id=>{ if(ent(id).s) apply('B'+id,{}); else E['B'+id]={...ent(id),shared:0}; });
+    }
+    persist(); render(); toast(mode==='one'?`Buckets ${g.b.join(', ')} now share one Farmer ID`:'Each bucket recorded separately'); return;}
+  const panel=e.target.closest('.entry'); if(!panel) return; const t=panel.dataset.t;
+  const sb=e.target.closest('.sbtn');
+  if(sb){ const s=sb.dataset.s; const cur=t[0]==='G'?ent(GR.get(+t.slice(1)).b[0]):ent(+t.slice(1));
+    if(s==='not'){                                       // nothing is recorded yet: first a reason must be chosen
+      if(DRAFT.has(t)||cur.s==='not') return; if(!who()) return;
+      DRAFT.add(t); render(); const sel=document.querySelector(`[data-t="${t}"] select[data-f=reason]`); sel&&sel.focus(); return; }
+    if(DRAFT.has(t)){ DRAFT.delete(t); if(cur.s===s){ render(); return; } }
+    if(cur.s===s) return;
+    if(apply(t,{s,n:1,fid:'',...(s==='gen'?{reason:'',note:''}:{})})){render(); toast(`${t[0]==='G'?'Buckets '+targets(t).map(x=>x.id).join(', '):'Bucket '+t.slice(1)}: ${STATUS[s]}`);
+      const next=document.querySelector(`[data-t="${t}"] select[data-f=reason]`); next&&next.focus();}
+    return;}
+  if(e.target.dataset.use){ if(apply(t,{fid:e.target.dataset.use})){render(); toast('Same Farmer ID applied');} return;}
+  if(e.target.closest('[data-reset]')){
+    if(DRAFT.has(t)){ DRAFT.delete(t); render(); return; }          // a draft is simply dropped; nothing was recorded
+    const ids=targets(t).map(x=>x.id);
+    if(!confirm(ids.length>1?`Remove the entry for buckets ${ids.join(', ')}?`:`Remove the entry for bucket ${ids[0]}?`)) return;
+    if(apply(t,{s:'',fid:'',reason:'',note:'',n:1})){render(); toast(ids.length>1?`Buckets ${ids.join(', ')} reset`:`Bucket ${ids[0]} reset`);} }
+});
+$('#list').addEventListener('change',e=>{
+  const panel=e.target.closest('.entry'); if(!panel||!e.target.dataset.f) return;
+  const t=panel.dataset.t, f=e.target.dataset.f;
+  let v=e.target.value.trim(); if(f==='fid'){v=v.toUpperCase(); e.target.value=v;} if(f==='n') v=+v;
+  const REMARKS_NEED_REASON=true;                       // remarks can be typed only after a reason is chosen
+  if(f==='reason'&&DRAFT.has(t)){                        // the reason completes the entry: now it is recorded and saved
+    if(!v) return;
+    if(apply(t,{s:'not',n:1,fid:'',reason:v,note:''})){ DRAFT.delete(t); render();
+      toast(`${t[0]==='G'?'Buckets '+targets(t).map(x=>x.id).join(', '):'Bucket '+t.slice(1)}: ${STATUS.not}`);
+      const nb=document.querySelector(`[data-t="${t}"] input[data-f=note]`); nb&&nb.focus(); }
+    else render();
+    return; }
+  if(f==='reason'&&!v){ e.target.value=ent(targets(t)[0].id).reason||''; toast('A reason is needed. Use Reset to remove the entry.'); return; }
+  if(f==='note'&&!ent(targets(t)[0].id).reason){ e.target.value=''; return; }
+  if(!apply(t,{[f]:v})){ if(f==='reason') render(); return; }
+  if(f==='reason'){ const nb=panel.querySelector('input[data-f=note]');
+    if(nb){ nb.disabled=!v; nb.placeholder=v?'Remarks (optional)':'Remarks – select a reason first'; if(!v) nb.value=''; } }
+  const st=panel.querySelector('.stamp'); if(st) st.innerHTML=stampText(ent(targets(t)[0].id));
+  // refresh hints in the same group without rebuilding the field being edited
+  const id=targets(t)[0].id, b=BY.get(id);
+  if(b.g&&f==='fid') GR.get(b.g).b.forEach(x=>{const h=document.querySelector(`#b${x} .hint`); if(h) h.innerHTML=linkedIdHint(BY.get(x));});
+  stats();
+});
+function toast(t){const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),1800);}
+
+/* ---------- row sent to the sheet / CSV ---------- */
+function rowFor(id){
+  const b=BY.get(id), e=ent(id);
+  let guide='';
+  if(b.g){const g=GR.get(b.g); guide=`Check if same person as bucket ${g.b.filter(x=>x!==id).join(', ')}`;}
+  if(b.st===3) guide+=(guide?'; ':'')+'May hold more than one person';
+  const shared=e.shared?GR.get(e.shared).b:[];
+  return {village:VILLAGE,bucket_id:b.u??id,owner:b.v[0][0],parentage:b.v[0][1],
+    other_names:b.v.slice(1).map(v=>v[0]+' / '+v[1]).join(' | '),plots:plotsOf(b),
+    survey_nos:[...new Set(b.v.flatMap(v=>v[3]))].join(', '),
+    khewat_nos:[...new Set(b.v.flatMap(v=>v[7]))].join(', '),khata_nos:[...new Set(b.v.flatMap(v=>v[8]))].join(', '),area_ha:b.e,group:b.g||'',guidance:guide,
+    status:e.s?STATUS[e.s]:'',
+    id_basis:e.s?(e.shared?`One ID for buckets ${shared.join(', ')}`:(e.s==='gen'&&(+e.n||1)>1?`${e.n} IDs for this bucket`:'Own entry')):'',
+    ids_counted:e.s==='gen'?(e.shared?(shared[0]===id?1:0):(+e.n||1)):0,
+    farmer_id:e.fid||'',reason:e.reason||'',remarks:e.note||'',
+    submitted_by:e.s||e.note?e.by||'':'',submitted_at:e.at?new Date(e.at).toISOString():''};
+}
+
+/* ---------- server calls (open entry: no username or password) ---------- */
+try{REASONS=JSON.parse(localStorage.getItem('farmerIdReasons')||'[]')}catch(e){}
+function setReasons(list){ if(!Array.isArray(list)) return; REASONS=list; try{localStorage.setItem('farmerIdReasons',JSON.stringify(list))}catch(e){} }
+const NKEY='farmerIdName';
+let NAME=''; try{NAME=localStorage.getItem(NKEY)||''}catch(e){}
+const SESSION={get username(){return NAME||'Public';}};      // the optional name is saved with each entry
+/* Viewing is open to all. Entering or changing data needs the common edit PIN.
+   The PIN is kept only while this page is open: it is asked again whenever the page is opened or reloaded. */
+const PIN_KEPT='page-only';
+let PIN=''; try{ localStorage.removeItem('farmerIdPin'); sessionStorage.removeItem('farmerIdPin'); }catch(e){}   // forget a PIN remembered by an earlier version
+let lastBtn=null;
+document.addEventListener('click',e=>{ const b=e.target.closest('#list button'); if(b) lastBtn=b; },true);
+/* One call to the Google Sheet. When Google is busy it answers with an error page instead of data
+   ("Unexpected token '<'"). The call is then tried again by itself a few times before anything is shown. */
+async function sheetCall(url,payload,tries=4){
+  let said='', net=false;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      const text=await r.text(); net=false;
+      try{ const j=JSON.parse(text); if(!(j&&j.busy)) return j; said=''; }
+      catch(_){ said=text.replace(/<(script|style)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim().slice(0,90); }
+    }catch(e){ net=true; }
+    if(i<tries-1) await new Promise(res=>setTimeout(res,[1500,3500,7000][i]+Math.random()*1200));
+  }
+  const e=new Error(net?'no connection to the Google Sheet':'the Google Sheet is busy'+(said?' – Google said “'+said+'”':'')); e.busy=true; throw e;
+}
+async function api(action,payload={}){
+  const j=await sheetCall(APPS_SCRIPT_URL,{action,village:VILLAGE,tehsil:TEHSIL,name:NAME,pin:PIN,...payload});
+  if(!j.ok){ const e=new Error(j.error||'Request failed'); e.pin=!!j.pin; if(e.pin){ setPin(''); askPin(j.error); } throw e; }
+  return j;
+}
+function setPin(p){ PIN=p; setAcct(); }
+function askPin(msg){ $('#perr').textContent=msg||''; $('#pinbox').hidden=false; $('#pin').value=''; setTimeout(()=>$('#pin').focus(),50); }
+$('#pform').addEventListener('submit',async e=>{
+  e.preventDefault(); const p=$('#pin').value.trim(); if(!p) return;
+  $('#pbtn').disabled=true; $('#perr').textContent='';
+  try{
+    PIN=p; await api('checkPin');
+    setPin(p); $('#pinbox').hidden=true; toast('Editing mode on');
+    if(pending.size) flush();
+    const b=lastBtn; lastBtn=null; if(b&&document.body.contains(b)) b.click();
+  }catch(err){ PIN=''; $('#perr').textContent=err.pin?'Wrong PIN':err.message; $('#pin').select(); }
+  finally{ $('#pbtn').disabled=false; }
+});
+$('#pcancel').addEventListener('click',()=>{ $('#pinbox').hidden=true; lastBtn=null; });
+function setAcct(){
+  $('#acct').innerHTML=APPS_SCRIPT_URL?(PIN?`<span class="lk on">Editing mode</span> <button class="linkbtn" id="lock">Exit editing</button> <label class="nm-l" for="myname">Your name</label> <input class="nm-i" id="myname" placeholder="optional" value="${esc(NAME)}" autocomplete="name">`:''):'Not connected to Google Sheets – entries stay on this device';
+}
+document.addEventListener('click',e=>{
+  if(e.target.id==='lock'){ if(pending.size&&!confirm('Some entries are not saved yet. Exit editing anyway? They will be sent after the PIN is entered again.')) return; setPin(''); setSync(); toast('Editing mode off – view only'); }
+});
+document.addEventListener('change',e=>{ if(e.target.id!=='myname') return; NAME=e.target.value.trim().slice(0,40); try{localStorage.setItem(NKEY,NAME)}catch(_){} });
+
+/* ---------- Google Sheets sync ---------- */
+const pending=new Set(Object.keys(E).filter(k=>k[0]==='B'&&!E[k].synced).map(k=>+k.slice(1)));
+let timer=null, busy=false;
+function queue(id){pending.add(id); setSync(); if(!timer) timer=setTimeout(flush,2500);}      // entries made within a few seconds are sent together
+async function flush(){
+  clearTimeout(timer); timer=null;
+  if(!APPS_SCRIPT_URL||busy||!pending.size||!PIN) return setSync();
+  busy=true; setSync('busy');
+  const ids=[...pending].slice(0,60);
+  try{
+    await api('openSave',{items:ids.map(rowFor)});
+    ids.forEach(id=>{pending.delete(id); if(E['B'+id]) E['B'+id].synced=true; const st=document.querySelector(`[data-t="B${id}"] .stamp`); if(st) st.innerHTML=stampText(ent(id));});
+    persist(); busy=false; setSync(); if(pending.size&&!timer) timer=setTimeout(flush,1000);
+  }catch(err){busy=false; if(err.pin){ setSync(); return; } setSync('err',err.message); clearTimeout(timer); timer=setTimeout(flush,9000+Math.random()*4000);}
+}
+function setSync(state,msg){
+  const el=$('#sync'), t=el.querySelector('span'); el.className='sync';
+  if(!APPS_SCRIPT_URL){t.textContent='Saved on this device only'; return;}
+  if(!PIN&&state!=='busy'&&state!=='err'&&state!=='loaderr'){ t.textContent=pending.size?`${pending.size} waiting – enter the PIN to save`:'View only. Tap Generated or Not generated on a bucket to edit.'; return; }
+  if(!SESSION){ if(state==='err'){el.classList.add('err'); t.textContent=`Could not load entries (${msg})`;} else if(state==='busy'){el.classList.add('busy'); t.textContent='Loading entries…';} else t.textContent='View only. Log in to enter data.'; return; }
+  if(state==='busy'){el.classList.add('busy'); t.textContent=busy?'Saving to Google Sheet…':'Loading entries…'; return;}
+  if(state==='loaderr'){el.classList.add('err'); t.textContent=msg; return;}
+  if(state==='err'){el.classList.add('err'); t.textContent=`${pending.size} not saved yet (${msg}). Trying again by itself.`; return;}
+  if(pending.size){el.classList.add('busy'); t.textContent=`${pending.size} waiting to save`; return;}
+  el.classList.add('ok'); t.textContent='All entries saved to Google Sheet';
+}
+let loadTries=0;
+async function load(){
+  if(!APPS_SCRIPT_URL) return;
+  if(!pending.size) setSync('busy');
+  try{
+    const j=await api('openList');
+    const seen=new Set(j.items.filter(it=>it.status).map(it=>idOf(it.bucket_id)));
+    // entries cleared elsewhere: drop saved local copies that the sheet no longer has
+    for(const k of Object.keys(E)) if(k[0]==='B'&&E[k].synced&&E[k].s&&!seen.has(+k.slice(1))) E[k]={...E[k],s:'',reason:'',note:'',fid:'',shared:0};
+    setReasons(j.reasons); setClaim(j.claim);
+    const rev={'Claimed':'gen','Not claimed':'not','Generated':'gen','Not generated':'not'};
+    for(const it of j.items){
+      const id=idOf(it.bucket_id); if(id===undefined) continue; const at=Date.parse(it.submitted_at)||0, loc=E['B'+id];
+      if(loc&&!loc.synced&&(loc.at||0)>at) continue;
+      const b=BY.get(id); if(!b) continue;
+      const shared=/^One ID for buckets/.test(it.id_basis||'')?b.g:0;
+      const n=+(String(it.id_basis||'').match(/^(\d+) IDs/)||[])[1]||1;
+      E['B'+id]={s:rev[it.status]||'',fid:it.farmer_id||'',reason:it.reason||'',note:it.remarks||'',n,shared,by:it.submitted_by||'',at,synced:true};
+      if(shared) E['G'+shared]={mode:'one'};
+    }
+    loadTries=0; persist(); render(); setSync(); if(pending.size) flush();
+  }catch(err){                                           // entries could not be read: keep trying by itself, the page stays usable
+    if(err.pin) return;
+    if(++loadTries<=6){ setSync('loaderr',`Entries made by others are not loaded yet (${err.message}). Trying again by itself.`); setTimeout(load,10000+Math.random()*5000); }
+    else setSync('loaderr',`Entries made by others could not be loaded (${err.message}). Reload the page after a minute.`);
+  }
+}
+window.addEventListener('beforeunload',e=>{if(APPS_SCRIPT_URL&&pending.size){e.preventDefault(); e.returnValue='';}});
+/* ---------- REPORT_DOWNLOADS: the buckets with their entries as they stand now, as PDF or Excel ----------
+   Order: Not generated (grouped by reason, in the order of the reasons list), then Not yet filled, then Generated. */
+function reportRows(){
+  const order=new Map(REASONS.map((r,i)=>[r,i]));
+  const rows=DATA.buckets.map(b=>{
+    const e=ent(b.id), pm=new Map();
+    b.v.forEach(v=>v[3].forEach((s,i)=>{ const k=v[7][i]+'|'+v[8][i]; if(!pm.has(k)) pm.set(k,{kw:v[7][i],kt:v[8][i],sv:[]}); const p=pm.get(k); if(!p.sv.includes(s)) p.sv.push(s); }));
+    const land=[...pm.values()].sort((x,y)=>(parseFloat(x.kw)||0)-(parseFloat(y.kw)||0)||(parseFloat(x.kt)||0)-(parseFloat(y.kt)||0))
+      .map(p=>`${p.kw!==''&&p.kw!=null?'Khewat '+p.kw+', Khata '+p.kt:(DATA.noAgri?'Survey nos.':'Khewat / Khata not found')}: ${p.sv.join(', ')}`);
+    const cat=e.s==='not'?0:e.s==='gen'?2:1;
+    return {id:b.id,name:b.v[0][0],par:b.v[0][1],land,status:e.s==='gen'?'Generated':e.s==='not'?'Not generated':'Not yet filled',
+      reason:e.s==='not'?(e.reason||''):'',remarks:e.note||'',cat,ro:e.s==='not'?(e.reason?(order.has(e.reason)?order.get(e.reason):900):999):0};
+  });
+  rows.sort((a,b)=>a.cat-b.cat||a.ro-b.ro||(a.cat===0?String(a.reason).localeCompare(String(b.reason)):0)||a.id-b.id);
+  return rows;
+}
+function reportCounts(rows){ const c={not:0,open:0,gen:0}; rows.forEach(r=>{ if(r.cat===0) c.not++; else if(r.cat===1) c.open++; else c.gen++; }); return c; }
+function reportName(ext){ return `farmer_id_${(VILLAGE||'village').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${new Date().toISOString().slice(0,10)}.${ext}`; }
+function loadJs(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>{ s.remove(); rej(new Error('could not load')); }; document.head.appendChild(s); }); }
+async function needLib(test,urls,what){ if(test()) return; for(const u of urls){ try{ await loadJs(u); if(test()) return; }catch(e){} } throw new Error(`the ${what} maker could not load – check the internet connection`); }
+function saveBlob(data,name,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+/* the PDF's built-in font has English letters only: Urdu letters are written out (ب → bay) */
+const URDU_L={'الف':'alif','ا':'alif','ب':'bay','پ':'pay','ت':'tay','ٹ':'ttay','ث':'say','ج':'jeem','چ':'chay','ح':'hay','خ':'khay','د':'daal','ڈ':'ddaal','ذ':'zaal','ر':'ray','ز':'zay','س':'seen','ش':'sheen','ص':'suad','ض':'zuad','ط':'toay','ظ':'zoay','ع':'ain','غ':'ghain','ف':'fay','ق':'qaaf','ک':'kaaf','گ':'gaaf','ل':'laam','م':'meem','ن':'noon','و':'wao','ہ':'hay','ه':'hay','ی':'yay','ي':'yay','ے':'yay'};
+const pdfT=s=>String(s??'').replace(/[؀-ۿ]+/g,w=>URDU_L[w]||[...w].map(c=>URDU_L[c]||'').filter(Boolean).join('-')||'?').replace(/[^\n\x20-\x7E -ÿ–—‘’“”•]/g,'?');
+async function reportPdf(){
+  await needLib(()=>window.jspdf&&window.jspdf.jsPDF,['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'],'PDF');
+  await needLib(()=>window.jspdf.jsPDF.API.autoTable,['https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js','https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'],'PDF');
+  const rows=reportRows(), c=reportCounts(rows), doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), M=28, body=[], kinds=[];
+  let last=null;
+  rows.forEach(r=>{
+    const sec=r.cat===0?'Not generated – '+(r.reason||'no reason given'):r.cat===1?'Not yet filled':'Generated';
+    if(sec!==last){ const n=rows.filter(x=>(x.cat===0?'Not generated – '+(x.reason||'no reason given'):x.cat===1?'Not yet filled':'Generated')===sec).length;
+      body.push([{content:pdfT(`${sec}  (${n})`),colSpan:7}]); kinds.push('h'+r.cat); last=sec; }
+    body.push([String(r.id),pdfT(r.name),pdfT(r.par),pdfT(r.land.join('\n')),r.status,pdfT(r.reason),pdfT(r.remarks)]); kinds.push('r'+r.cat);
+  });
+  const when=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+  doc.autoTable({
+    head:[['Bucket no.','Name','Parentage','Khewat, Khata, Khasra','Farmer ID status','Reason (if not generated)','Remarks']],
+    body, startY:64, margin:{left:M,right:M,top:52,bottom:30}, theme:'grid',
+    styles:{font:'helvetica',fontSize:8.4,cellPadding:4,valign:'top',lineColor:[201,208,214],lineWidth:.5,textColor:[28,42,54],overflow:'linebreak'},
+    headStyles:{fillColor:[28,42,54],textColor:255,fontStyle:'bold'},
+    columnStyles:{0:{cellWidth:48,halign:'center',fontStyle:'bold'},1:{cellWidth:110},2:{cellWidth:105},3:{cellWidth:220},4:{cellWidth:72},5:{cellWidth:140},6:{cellWidth:'auto'}},
+    rowPageBreak:'avoid',
+    didParseCell:x=>{ if(x.section!=='body') return; const k=kinds[x.row.index];
+      if(k[0]==='h'){ x.cell.styles.fontStyle='bold'; x.cell.styles.fontSize=9; x.cell.styles.fillColor=k==='h0'?[248,227,220]:k==='h2'?[230,240,234]:[236,238,233]; x.cell.styles.textColor=k==='h0'?[168,67,42]:k==='h2'?[47,107,79]:[74,90,103]; }
+      else if(x.column.index===4) x.cell.styles.textColor=k==='r0'?[168,67,42]:k==='r2'?[47,107,79]:[124,138,149]; },
+    didDrawPage:()=>{
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(28,42,54); doc.text(pdfT(`Farmer ID status by bucket – ${VILLAGE}, District Kupwara`),M,30);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,104,115);
+      doc.text(`${rows.length} buckets · Not generated ${c.not} · Not yet filled ${c.open} · Generated ${c.gen} · as on ${when}`,M,44);
+      doc.setFontSize(8); doc.text('Page '+doc.internal.getNumberOfPages(),W-M,doc.internal.pageSize.getHeight()-14,{align:'right'});
+    }
+  });
+  saveBlob(doc.output('arraybuffer'),reportName('pdf'),'application/pdf');
+}
+async function reportXlsx(){
+  await needLib(()=>window.ExcelJS,['https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js','https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'],'Excel');
+  const rows=reportRows(), c=reportCounts(rows), wb=new window.ExcelJS.Workbook();
+  const ws=wb.addWorksheet('Buckets',{views:[{state:'frozen',ySplit:1}],pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:1'}});
+  ws.columns=[['Bucket no.',10],['Name',24],['Parentage',22],['Khewat, Khata, Khasra',50],['Farmer ID status',16],['Reason (if not generated)',38],['Remarks',30]].map(([header,width])=>({header,width}));
+  rows.forEach(r=>{ let l=r.land.join('\n'); if(l.length>32000){ const k=l.slice(0,l.lastIndexOf('\n',31900)); l=k+'\n… and '+(r.land.length-k.split('\n').length)+' more (too long for one Excel cell)'; } ws.addRow([r.id,r.name,r.par,l,r.status,r.reason,r.remarks]); });
+  const thin={style:'thin',color:{argb:'FFC9D0D6'}};
+  ws.getRow(1).eachCell(x=>{ x.font={bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1C2A36'}}; x.alignment={vertical:'middle',wrapText:true}; x.border={top:thin,left:thin,bottom:thin,right:thin}; });
+  rows.forEach((r,i)=>{ const row=ws.getRow(i+2), fill=r.cat===0?'FFF8E3DC':r.cat===2?'FFE6F0EA':null;
+    for(let k=1;k<=7;k++){ const x=row.getCell(k); x.alignment={vertical:'top',wrapText:true}; x.border={top:thin,left:thin,bottom:thin,right:thin}; if(fill&&k===5) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}}; }
+    row.getCell(1).alignment={vertical:'top',horizontal:'center'}; row.getCell(1).font={bold:true}; });
+  ws.autoFilter={from:{row:1,column:1},to:{row:rows.length+1,column:7}};
+  const s=wb.addWorksheet('Summary'), when=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const byR=new Map(); rows.filter(r=>r.cat===0).forEach(r=>byR.set(r.reason||'(no reason given)',(byR.get(r.reason||'(no reason given)')||0)+1));
+  [['Village',VILLAGE],['District','Kupwara'],['As on',when],[],['Total buckets',rows.length],['Not generated',c.not],['Not yet filled',c.open],['Generated',c.gen],[],['Not generated, by reason','Buckets']]
+    .concat([...byR.entries()]).forEach(r=>s.addRow(r));
+  s.getColumn(1).width=48; s.getColumn(2).width=24; [1,5,10].forEach(n=>s.getRow(n).font={bold:true});
+  saveBlob(await wb.xlsx.writeBuffer(),reportName('xlsx'),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('#dl-pdf,#dl-xls'); if(!b) return;
+  const label=b.textContent; b.disabled=true; b.textContent='Preparing…';
+  try{ await (b.id==='dl-pdf'?reportPdf():reportXlsx()); }catch(err){ toast(err.message); }
+  b.disabled=false; b.textContent=label;
+});
+
+
+$('#csv').addEventListener('click',()=>{
+  const rows=DATA.buckets.map(b=>rowFor(b.id)), cols=Object.keys(rows[0]);
+  const csv=[cols.join(',')].concat(rows.map(o=>cols.map(c=>`"${String(o[c]).replace(/"/g,'""')}"`).join(','))).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
+  a.download=`farmer_id_by_bucket_${(VILLAGE||'village').replace(/\W+/g,'_')}.csv`; a.click();
+});
+
+/* ---------- miscellaneous information ---------- */
+function miscHtml(){ if(DATA.noAgri) return `<p>No AgriStack village file was available for ${esc(VILLAGE||'this village')} when this page was made, so khewat and khata numbers are not shown. Each bucket shows its survey numbers from the AgriStack bucket data.</p>`;
+  const X=DATA.extra, isInd=r=>!/^(na|sarkar|)$/i.test(String(r[1]).trim());
+  const ind=X.filter(isInd), non=X.filter(r=>!isInd(r));
+  const cat=r=>{const n=r[0].toLowerCase();
+    if(/aabadi|abadi/.test(n)) return 'Aabadi Deh'; if(/shamilat/.test(n)) return 'Shamilat';
+    if(/ring road|nhai|sarkar/.test(n)) return 'Sarkar / Ring Road / NHAI'; if(/road|khhad|ghadh/.test(n)) return 'Roads and other public use';
+    if(/imambada|shia|ahli islam|ahl /.test(n)) return 'Religious / community'; if(/maqbooza|makbooza/.test(n)) return 'Maqbooza (departments, canals, panchayat)'; return 'Other';};
+  const groups={}; non.forEach(r=>(groups[cat(r)]=groups[cat(r)]||[]).push(r));
+  const tbl=(rows,owner=true)=>`<div class="mtwrap"><table class="mt"><thead><tr>${owner?'<th>Owner</th><th>Parentage</th>':'<th>Recorded as</th>'}<th>Khasra</th><th>Khewat</th><th>Khata</th><th>Hectare</th><th>Holder</th></tr></thead><tbody>${rows.map(r=>`<tr>${owner?`<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`:`<td>${esc(r[0])}</td>`}<td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${r[5].toFixed(4)}</td><td>${esc(r[6])}</td></tr>`).join('')}</tbody></table></div>`;
+  const indNames=[...new Map(ind.map(r=>[r[0]+'|'+r[1],r])).values()].map(r=>`${esc(r[0])} s/o ${esc(r[1])} (${ind.filter(x=>x[0]===r[0]&&x[1]===r[1]).length} plot${ind.filter(x=>x[0]===r[0]&&x[1]===r[1]).length>1?'s':''})`);
+  const M=DATA.mismatch;
+  return `<p>The AgriStack record for ${esc(VILLAGE||'this village')} has ${DATA.agriPlots.toLocaleString()} plots in ${DATA.khewats} khewats and ${DATA.khatas} khatas. Every plot in the bucket data was found in it, with matching owner, parentage and area.</p>
+  <h3>Extra plots in AgriStack: ${X.length} plots are not in any bucket</h3>
+  <p>${non.length} are non-individual land: ${Object.keys(groups).join(', ')}. The other ${ind.length} look like individuals left out of the buckets: ${indNames.join(', ')}.</p>
+  <h3>Individuals without a bucket</h3>${tbl(ind)}
+  <h3>Non-individual land</h3>
+  ${Object.entries(groups).map(([k,rows])=>`<details class="cat"><summary>${esc(k)}: ${rows.length} plot${rows.length>1?'s':''}, ${rows.reduce((a,r)=>a+r[5],0).toFixed(4)} ha</summary>${tbl(rows,false)}</details>`).join('')}
+  ${M.length?`<h3>Khasra recorded differently</h3><p>In ${M.length===1?'this plot':'these plots'} the bucket data and AgriStack give a different khasra number. Correct the bucket data.</p>
+  <div class="mtwrap"><table class="mt"><thead><tr><th>Bucket</th><th>In bucket data</th><th>In AgriStack</th><th>Khewat</th><th>Khata</th><th>Plot ID</th></tr></thead><tbody>${M.map(r=>`<tr><td>${r[0]}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+}
+$('#misc').addEventListener('click',()=>{$('#miscBody').innerHTML=miscHtml(); $('#miscDlg').showModal();});
+$('#miscClose').addEventListener('click',()=>$('#miscDlg').close());
+$('#miscDlg').addEventListener('click',e=>{if(e.target.id==='miscDlg') $('#miscDlg').close();});
+
+setAcct(); render(); setSync(); if(APPS_SCRIPT_URL) load();
+</script>
+</body>
+</html>

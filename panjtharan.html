@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farmer ID status by bucket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<script>
+/* ============ SETTINGS – edit these lines only ============ */
+const VILLAGE = "panjtharan";   // village name – must match the village registered in the admin page
+const TEHSIL = "Kupwara";     // tehsil – must match too
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwD4Fwxu4vyXw179KWFoSpYNlq5pcOTp_X0UwLHqIIFOPFvV1A_eur5v33Rn1MMWWk/exec";  // paste the Apps Script /exec URL to save to Google Sheets
+let REASONS = [];                // filled from the 'Reasons' tab of the Google Sheet when the page loads
+</script>
+<style>
+:root{
+  --ink:#1c2a36; --ink-2:#4a5a67; --ink-3:#7c8a95;
+  --paper:#f5f6f3; --card:#fff; --line:#dde2dc; --line-2:#eceee9;
+  --field:#2f6b4f; --field-bg:#e6f0ea;
+  --amber:#8a5a10; --amber-bg:#fbf1dc;
+  --brick:#a8432a; --brick-bg:#f8e3dc;
+  --slate:#43607a; --slate-bg:#e3eaf1;
+  --orange:#b85a0d; --orange-bg:#fdecd9; --orange-2:#f3c9a0;
+  --hit:#fff1a8;
+  --focus:#2a6fdb; --submit-bg:#f1f4f8; --submit-line:#b9c6d4; --card-line:#c9d0d6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e6ebef; --ink-2:#b3bec7; --ink-3:#86939d;
+    --paper:#141a1f; --card:#1c242b; --line:#2f3a43; --line-2:#252f37;
+    --field:#6cc19a; --field-bg:#1e3329; --amber:#f0c677; --amber-bg:#3a2d17;
+    --brick:#ef8f76; --brick-bg:#3b231d; --slate:#9ab8d3; --slate-bg:#22303d; --submit-bg:#1f2830; --submit-line:#3f4f5d; --card-line:#3a4650; --orange:#f5a45c; --orange-bg:#3a2715; --orange-2:#6b4320; --hit:#5a4d12;
+  }
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 130px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:0 18px}
+
+header{padding:26px 0 16px}
+h1{font:600 27px/1.15 "IBM Plex Serif",Georgia,serif;margin:0}
+.sub{color:var(--ink-2);margin:6px 0 0}
+.meta{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:14px}
+.reviewer{display:flex;align-items:center;gap:8px}
+.reviewer label{color:var(--ink-2);font-size:14px}
+.reviewer input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 10px;width:210px}
+.reviewer input.need{border-color:var(--brick);box-shadow:0 0 0 3px var(--brick-bg)}
+.sync{font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.sync.ok i{background:var(--field)} .sync.busy i{background:#c98a1b} .sync.err i{background:var(--brick)}
+.dlbtn{border:1.5px solid var(--slate);background:var(--card);color:var(--slate);border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.dlbtn:hover{background:color-mix(in srgb,var(--slate) 8%,var(--card))}
+.dlbtn:disabled{opacity:.6;cursor:default}
+.linkbtn{background:none;border:0;padding:0;color:var(--slate);text-decoration:underline;cursor:pointer;font-size:13px}
+
+.stats{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:18px;font-variant-numeric:tabular-nums}
+.stat b{font-size:22px;font-weight:600;display:block;line-height:1.1}
+.stat span{font-size:13px;color:var(--ink-2)}
+.stat.g b{color:var(--field)} .stat.n b{color:var(--brick)}
+.bigbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex;margin-top:12px;max-width:520px}
+.bigbar i{display:block;height:100%}
+
+.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding:10px 0}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.smode{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.smode button{border:0;background:none;padding:8px 12px;font-size:14px;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+.smode button+button{border-left:1px solid var(--line)}
+.smode button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.qinfo{font-size:13px;color:var(--ink-2);padding-top:6px}
+.qinfo:empty{display:none}
+.qinfo b{color:var(--ink)}
+.search{font-size:16px;flex:1 1 220px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-top:8px}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+.chip em{font-style:normal;color:var(--ink-3);margin-left:4px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.chip[aria-pressed="true"] em{color:var(--paper);opacity:.7}
+
+main{padding-top:14px}
+.group{border-left:5px solid var(--orange);background:var(--orange-bg);border-radius:10px;padding:10px 10px 2px;margin:0 0 14px}
+.group.med{border-left-style:dashed}
+.ghead{font-size:14px;color:var(--orange);padding:0 4px 8px}
+.ghead b{font-weight:600}
+.warnline{font-size:13px;color:var(--brick);padding:0 4px 8px}
+.warnline:empty{display:none}
+
+.bk{background:var(--card);border:1px solid var(--card-line);border-radius:12px;margin:0 0 18px;display:grid;grid-template-columns:1fr minmax(280px,360px);box-shadow:0 1px 2px rgba(20,30,40,.06),0 3px 10px rgba(20,30,40,.05)}
+.bk.filled{border-color:var(--card-line)}
+.info{padding:14px 16px;min-width:0}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.uid{margin-top:2px;font-size:11px;color:var(--ink-3);font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+.bid{font-weight:600;font-variant-numeric:tabular-nums;background:var(--ink);color:var(--paper);border-radius:6px;padding:2px 9px;font-size:14px}
+.nm{font-weight:600;font-size:16px}
+.par{color:var(--ink-2);font-size:14px}
+.par::before{content:"Parentage ";color:var(--ink-3)}
+.facts{font-size:13px;color:var(--ink-3);margin-top:3px;font-variant-numeric:tabular-nums}
+.svs{font-size:13px;color:var(--ink-3);word-break:break-word}
+.svs mark{background:none;color:var(--orange);border-bottom:2px solid var(--orange-2);padding:0 1px}
+.svs mark.k,.found mark{background:var(--hit);color:var(--ink);border:0;border-radius:3px;padding:0 4px;font-weight:600}
+.kk{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.kr{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:13px;padding:3px 8px;border-left:4px solid var(--kc);background:color-mix(in srgb,var(--kc) 9%,transparent);border-radius:0 5px 5px 0;color:var(--kc)}
+.kl{font-weight:600;white-space:nowrap}
+.ks{color:var(--kc);word-break:break-word}
+.kr .ks mark{color:var(--kc)}
+.c0{--kc:#2b5d9b}.c1{--kc:#7a3f9d}.c2{--kc:#1f7a74}.c3{--kc:#a3345f}.c4{--kc:#5b6b1f}.c5{--kc:#3f4fb0}.c6{--kc:#7a5230}.c7{--kc:#4a5a67}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .c0{--kc:#8fb6ea}:root:not([data-theme="light"]) .c1{--kc:#c89be4}:root:not([data-theme="light"]) .c2{--kc:#7fd0c8}:root:not([data-theme="light"]) .c3{--kc:#ec9ab9}:root:not([data-theme="light"]) .c4{--kc:#bfcf7a}:root:not([data-theme="light"]) .c5{--kc:#a3aef0}:root:not([data-theme="light"]) .c6{--kc:#d9ae86}:root:not([data-theme="light"]) .c7{--kc:#b3bec7}}
+.found{font-size:13px;margin-top:6px;color:var(--ink-2)}
+.found div{padding:1px 0}
+.bk.match{box-shadow:0 0 0 2px var(--hit)}
+.guide{font-size:13px;margin-top:8px;padding:6px 10px;border-radius:6px}
+.guide.link{background:var(--orange-bg);color:var(--orange)}
+.guide.warn{background:var(--brick-bg);color:var(--brick)}
+.guide.soft{background:var(--line-2);color:var(--ink-2)}
+.guide ul{margin:4px 0 0;padding-left:18px}
+
+.entry{margin:10px;align-self:start;border:1.5px solid var(--submit-line);background:var(--submit-bg);padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-radius:9px}
+.entry.s-gen{border-color:color-mix(in srgb,var(--field) 45%,transparent);background:color-mix(in srgb,var(--field) 6%,var(--card))}
+.entry.s-not{border-color:color-mix(in srgb,var(--brick) 45%,transparent);background:color-mix(in srgb,var(--brick) 6%,var(--card))}
+.elabel{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+.elabel span{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3);margin-left:6px}
+.entry .sbtn,.entry .rbtn{background:var(--card)}
+.entry.s-gen .elabel{color:var(--field)} .entry.s-not .elabel{color:var(--brick)}
+.seg{display:flex;gap:4px}
+.sbtn{flex:1;border:1px solid var(--line);background:var(--card);border-radius:7px;padding:7px 6px;cursor:pointer;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.sbtn:hover{border-color:var(--ink-3)}
+.rbtn{flex:0 0 auto;border:1px dashed var(--ink-3);background:none;border-radius:7px;padding:7px 10px;cursor:pointer;font-size:14px;color:var(--ink-2)}
+.rbtn:hover:not(:disabled){border-style:solid;color:var(--ink)}
+.rbtn:disabled{opacity:.35;cursor:default}
+.sbtn.on.gen{background:var(--field);border-color:var(--field);color:#fff}
+.sbtn.on.not{background:var(--brick);border-color:var(--brick);color:#fff}
+.entry input,.entry select{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:7px 10px;font-size:14px}
+.stat.ag b{color:var(--field)}
+.agbtn{display:block;margin-top:8px;border:1.5px solid var(--field);background:var(--field-bg);color:var(--field);border-radius:8px;padding:7px 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.agbtn.on{background:var(--field);color:#fff}
+.side{display:flex;flex-direction:column;min-width:0}
+.claim{margin:10px 10px 0;border-radius:9px;padding:9px 13px;border:1.5px solid;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.claim .ct{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;width:100%;opacity:.8}
+.claim b{font-size:16px}
+.claim small{font-size:12px;opacity:.8}
+.claim .cw{width:100%;font-size:13px;font-weight:600;margin-top:4px}
+.claim.cl{background:var(--field-bg);border-color:color-mix(in srgb,var(--field) 45%,transparent);color:var(--field)}
+.claim.pt{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber) 45%,transparent);color:var(--amber-ink,var(--amber))}
+.claim .cp{width:100%;font-size:13px}
+.claim.un{background:var(--brick-bg);border-color:color-mix(in srgb,var(--brick) 35%,transparent);color:var(--brick)}
+.info .claim{margin:10px 0 0}
+.entry select.need{border-color:var(--brick);border-width:2px}
+.needmsg{font-size:13px;color:var(--brick);margin-top:6px;font-weight:500}
+.entry.draft{border-style:dashed}
+.entry input:disabled{opacity:.55;cursor:not-allowed;background:var(--line-2)}
+.entry input.fid{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.use{font-size:13px;color:var(--orange)}
+.use button{border:1px solid var(--orange);background:none;color:var(--orange);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:4px}
+.stamp{font-size:12px;color:var(--ink-3)}
+.clear{background:none;border:0;color:var(--ink-3);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;align-self:flex-start}
+
+.more{display:block;margin:6px auto 30px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:9px 18px;cursor:pointer}
+.empty{padding:40px 0;text-align:center;color:var(--ink-3)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+dialog{border:0;border-radius:12px;padding:0;max-width:760px;width:calc(100% - 24px);max-height:86vh;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(20,26,31,.45)}
+.dlg{padding:18px 20px 22px}
+.dhead{display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--card);padding-bottom:6px}
+.dhead h2{font:600 20px/1.2 "IBM Plex Serif",Georgia,serif;margin:0;flex:1}
+.dclose{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:5px 12px;cursor:pointer}
+.dlg h3{font-size:15px;margin:18px 0 4px}
+.dlg p{margin:4px 0;color:var(--ink-2);font-size:14px;max-width:70ch}
+.mt{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;font-variant-numeric:tabular-nums}
+.mt th{text-align:left;font-weight:500;color:var(--ink-3);border-bottom:1px solid var(--line);padding:5px 6px}
+.mt td{border-bottom:1px solid var(--line-2);padding:5px 6px;vertical-align:top}
+.mt tr.flag td{background:var(--orange-bg)}
+.mtwrap{overflow-x:auto}
+details.cat{border-top:1px solid var(--line-2);padding:6px 0}
+details.cat summary{cursor:pointer;font-size:14px}
+.acct{font-size:14px;color:var(--ink-2)}
+.acct b{color:var(--ink)}
+.lk{font-size:14px;font-weight:600}.lk.on{color:var(--field)}
+.nm-l{margin-left:10px;font-size:14px;color:var(--ink-2)}
+.nm-i{border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:var(--card);width:170px;font-size:14px}
+.login{position:fixed;inset:0;z-index:50;background:rgba(20,26,31,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.login[hidden]{display:none}
+.lbox{width:100%;max-width:360px;background:var(--card);border:1px solid var(--card-line);border-radius:14px;padding:26px 24px;box-shadow:0 4px 24px rgba(20,30,40,.08)}
+.lbox h2{font:600 24px/1.2 "IBM Plex Serif",Georgia,serif;margin:0}
+.lsub{color:var(--ink-2);margin:4px 0 16px}
+.lbox label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px}
+.lbox input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card);font-size:16px}
+.lbtn{width:100%;margin-top:18px;border:0;background:var(--ink);color:var(--paper);border-radius:8px;padding:11px;font-weight:600;cursor:pointer}
+.lbtn:disabled{opacity:.5}
+.lview{display:block;margin:6px auto 0;background:none;border:0;color:var(--slate);text-decoration:underline;cursor:pointer;font-size:14px}
+.loginbtn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:6px 14px;font-weight:600;cursor:pointer;font-size:14px}
+.lerr{color:var(--brick);font-size:14px;min-height:1.2em;margin:10px 0 0}
+footer{color:var(--ink-3);font-size:13px;padding:10px 0 40px}
+@media (max-width:720px){
+  h1{font-size:22px} header{padding-top:18px}
+  .bk{grid-template-columns:1fr}
+  .entry{margin:0 10px 10px}
+  .group{padding:8px 6px 1px}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+<style>
+.stats{gap:10px 30px}
+.stat.p b{color:var(--ink-3)}
+.stat.id{padding-left:26px;border-left:1px solid var(--line)}
+.stat.id b{color:var(--slate)}
+.stat small{display:block;font-size:12px;color:var(--ink-3)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink-3);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.gmode{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 4px 10px}
+.gmode span{font-size:13px;color:var(--ink-2)}
+.mbtn{border:1px solid var(--orange);background:var(--card);color:var(--orange);border-radius:7px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+.mbtn.on{background:var(--orange);color:#fff}
+.gentry{background:var(--card);border:1px solid var(--orange);border-radius:10px;margin:0 0 10px;padding:12px 14px;display:grid;grid-template-columns:1fr minmax(280px,360px);gap:10px}
+.gentry .gsum{font-size:14px;color:var(--ink-2)}
+.gentry .gsum b{color:var(--ink)}
+.gentry .entry{margin:0}
+.bk.covered{grid-template-columns:1fr}
+.bk.covered .entry{display:none}
+.cov{font-size:13px;margin-top:8px;color:var(--orange)}
+.cov.g{color:var(--field)} .cov.n{color:var(--brick)}
+.nids{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+.nids select{width:auto}
+@media (max-width:720px){.gentry{grid-template-columns:1fr}.stat.id{padding-left:0;border-left:0}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>Farmer ID status by bucket<span id="vname"></span></h1>
+  <p class="sub" id="totals"></p>
+  <div class="meta">
+    <span class="acct" id="acct"></span>
+    <span class="sync" id="sync"><i></i><span></span></span>
+    <button class="dlbtn" id="dl-pdf" type="button">Download PDF</button>
+    <button class="dlbtn" id="dl-xls" type="button">Download Excel</button>
+    <button class="linkbtn" id="csv">Download all buckets (CSV)</button>
+    <button class="linkbtn" id="misc">Miscellaneous information</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="bigbar" id="bigbar"></div>
+  <div class="legend"><span><i style="background:var(--field)"></i>Buckets claimed</span><span><i style="background:var(--line)"></i>Buckets not claimed</span><span><i style="background:var(--orange)"></i>Check if same person in more than one bucket</span></div>
+</header>
+
+<div class="bar"><div class="wrap">
+  <div class="tools">
+    <div class="smode" role="group" aria-label="Search by">
+      <button data-m="khasra" aria-pressed="true">Khasra No.</button><button data-m="name" aria-pressed="false">Name</button>
+    </div>
+    <input class="search" id="q" type="search" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="qinfo" id="qinfo" aria-live="polite"></div>
+  <div class="chips" id="chips"></div>
+</div></div>
+
+<main class="wrap"><div id="list"></div></main>
+<footer class="wrap">Record for every bucket whether a Farmer ID has been generated. Buckets in an orange block appear to belong to one person: choose "One Farmer ID for all" to record them together, so they count as one Farmer ID. A red note means one bucket may hold more than one person. Nothing has been merged on the portal.</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="login" id="pinbox" hidden>
+  <form class="lbox" id="pform" autocomplete="off">
+    <h2>Enter PIN</h2>
+    <p class="lsub">Enter the PIN to make or change entries.</p>
+    <label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" required>
+    <button class="lbtn" id="pbtn" type="submit">Start editing</button>
+    <p class="lerr" id="perr" role="alert"></p>
+    <button type="button" class="lview" id="pcancel">Cancel – just view</button>
+  </form>
+</div>
+<dialog id="miscDlg" aria-labelledby="miscTitle"><div class="dlg">
+  <div class="dhead"><h2 id="miscTitle">Miscellaneous information</h2><button class="dclose" id="miscClose" aria-label="Close">Close</button></div>
+  <div id="miscBody"></div>
+</div></dialog>
+
+<script>
+const DATA = {"buckets":[{"id":1,"st":0,"v":[["shamlat dh","shamlat dh",38,["213","60","284","159","186","316/229","315/229","6","158","190","189","74","227","224","64","313/24","312/24","223","222","169","169/1","25","314/24","226","228","184","198","157","219","191","185","225","63","197","12","212","156","160"],["JK364663062697","JK365235459623","JK349041856511","JK353565193813","JK368683966580","JK367919606353","JK348195995622","JK346323108790","JK352895686645","JK352148560995","JK351543853258","JK346889613289","JK351017987285","JK350204826333","JK369463459149","JK382747923650","JK381983436466","JK378613244837","JK377426719329","JK385577422887","JK384839466432","JK384085649103","JK383449229384","JK358398668062","JK359004912394","JK370180066641","JK375737722510","JK359556191808","JK376535357588","JK361390920839","JK362029272771","JK357528644931","JK362540944772","JK363071474886","JK356725995600","JK363909923264","JK356102128877","JK355320017989"],13.473517,0,["","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""]]],"e":13.473517,"k":"266K-7M-0S","r":"","g":0,"u":"ffc89192-7c26-4c12-a683-4f2892bed259"},{"id":2,"st":0,"v":[["hasan ali shah","mehmood shah",23,["21","92/1","4","19","40","41","93","98","118","58","51","50","46/1","88","91","92","84","86","95","95/1","297/1","97","94"],["JK208768666932","JK204883528945","JK207360086259","JK208104943914","JK209337648178","JK210608041259","JK218757923347","JK221188126867","JK221939659854","JK213186498007","JK212690895885","JK211944374525","JK211357522522","JK216739020530","JK217640971205","JK218218729484","JK214299082482","JK214857328319","JK220714156697","JK290332383912","JK299066631146","JK298101276998","JK223057784920"],0.908758,0,["","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","",""]]],"e":0.908758,"k":"17K-19M-3S","r":"","g":0,"u":"ff945b9d-a4dd-4fed-8a4a-73d7006c9c20"},{"id":3,"st":0,"v":[["masmat bi bi fatima","hussain shah",2,["293/125","26"],["JK566662132207","JK517555630193"],0.046282,0,["",""],["",""]]],"e":0.046282,"k":"0K-18M-3S","r":"","g":0,"u":"ff51a3d9-9891-415f-b2d4-0f329492f474"},{"id":4,"st":0,"v":[["zameer ahmad shah","noor ahmed shah",8,["46","116","324/309/258","66","93/1","299/17","22","67"],["JK701044070400","JK638488334525","JK706045052283","JK710548160335","JK641027278453","JK703052955310","JK643706385442","JK255500219756"],0.086814,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.086814,"k":"1K-14M-3S","r":"","g":0,"u":"fd19a8e7-a21a-4114-9490-99837fbb5620"},{"id":5,"st":0,"v":[["mir haider shah","mohammad zaman shah",11,["140","111","139","137","233","65","9","61","235","62","234"],["JK736518549557","JK734686622505","JK764677544263","JK762920731843","JK761888823877","JK727941342312","JK722709448208","JK725406481322","JK740326765805","JK726691030509","JK738627776635"],0.572124,0,["","","","","","","","","","",""],["","","","","","","","","","",""]]],"e":0.572124,"k":"11K-6M-2S","r":"","g":0,"u":"fbf79a8a-49b8-4f5d-aa94-014d15e1fc19"},{"id":6,"st":0,"v":[["anees fatima","muzmil hussain",5,["45","303","9/1","23","42"],["JK772134985735","JK775175253513","JK770118684465","JK768942845405","JK773477975670"],0.289603,0,["","","","",""],["","","","",""]]],"e":0.289603,"k":"5K-14M-4S","r":"","g":0,"u":"f8334a61-f391-450d-b340-a302e1378a14"},{"id":7,"st":0,"v":[["nawab haan","gulab khan",1,["16"],["JK635084267959"],0.407215,0,[""],[""]]],"e":0.407215,"k":"8K-1M-0S","r":"","g":0,"u":"f7e9a8fd-3dc9-4300-b4b3-826c209ec303"},{"id":8,"st":0,"v":[["masmat muzml fatima","gulam mohi uddin shah",1,["305/152/1"],["JK344025211108"],0.028117,0,[""],[""]]],"e":0.028117,"k":"0K-11M-1S","r":"","g":0,"u":"f75ab041-e7b6-4048-9ed7-6a8136fafe80"},{"id":9,"st":0,"v":[["bi bi fatima","yousuf shah",1,["293/125"],["JK566663424066"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"f5dadd7a-aaf5-42d6-a3a0-ca51d77be6d0"},{"id":10,"st":0,"v":[["arshid hussain","ab hameed",1,["288/188"],["JK933011625097"],0.013405,0,[""],[""]]],"e":0.013405,"k":"0K-5M-3S","r":"","g":0,"u":"f420eb24-5a12-4ee6-bf2d-838f592509f1"},{"id":11,"st":0,"v":[["gulam haider","sayed alam shah",9,["18","22","93/1","46","116","67","66","299/17","324/309/258"],["JK669419979410","JK643704053612","JK641024069385","JK701043489315","JK638486038254","JK255486003608","JK710544811483","JK703051101755","JK706043465705"],0.242774,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.242774,"k":"4K-16M-0S","r":"","g":0,"u":"f4167d64-f5f1-4d20-9724-76bacdff32a1"},{"id":12,"st":0,"v":[["gulam maste","miskeen",1,["221"],["JK617883499277"],0.073349,0,[""],[""]]],"e":0.073349,"k":"1K-9M-0S","r":"","g":0,"u":"f18268ac-8079-4e56-b37b-c3a1fe6978bf"},{"id":13,"st":0,"v":[["masmat fitmah begum","miskeen",1,["221"],["JK617888805031"],0.073349,0,[""],[""]]],"e":0.073349,"k":"1K-9M-0S","r":"","g":0,"u":"f0f491da-df1a-4355-8092-d7a6bcfe63a2"},{"id":14,"st":0,"v":[["sakina fatima","yousuf shah",1,["293/125"],["JK566667701940"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"ee266270-0b43-4b40-a81e-fa03af6d5c54"},{"id":15,"st":0,"v":[["inayat ulla shah","sayed mir shah",23,["134","104","36","37","280","283","230","8","105","106","106/1","135","141","195","143","129","136","115","270","271","307/144","54","35"],["JK427832390485","JK407693671066","JK412281005071","JK413101974207","JK415365025303","JK416913879774","JK418590701311","JK419112729854","JK420307371678","JK420723193666","JK421253912386","JK423930452201","JK425313699449","JK426029374080","JK666104454387","JK428622628274","JK429839472556","JK438886311308","JK448880101860","JK443301385285","JK453125429039","JK414418719834","JK419791447841"],0.804313,0,["","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","",""]]],"e":0.804313,"k":"15K-18M-0S","r":"","g":0,"u":"edbea9fc-0549-4416-b948-7b21347baed7"},{"id":16,"st":0,"v":[["zalhya begum","miskeen",1,["221"],["JK617887094460"],0.073349,0,[""],[""]]],"e":0.073349,"k":"1K-9M-0S","r":"","g":0,"u":"ec27e151-1e53-4097-8511-585151a46e04"},{"id":17,"st":0,"v":[["zaman shah","fathe ali shah",2,["147","145"],["JK703977143150","JK707007946045"],0.518504,0,["",""],["",""]]],"e":0.518504,"k":"10K-5M-0S","r":"","g":0,"u":"ec15d53d-5a59-4cba-bc1e-be27adb9825f"},{"id":18,"st":1,"v":[["manir hussain shah","mohammad shah",3,["211","217","151"],["JK287402710521","JK199687337246","JK286162671984"],0.081587,0,["","",""],["","",""]],["munir hussain shah","mohammad shah",3,["202","201","155"],["JK232010763729","JK214356736251","JK211694341080"],0.021347,1,["","",""],["","",""]]],"e":0.102934,"k":"2K-0M-6S","r":"","g":0,"u":"eb7fd4c6-93a4-4f48-8552-8508269e36ef"},{"id":19,"st":0,"v":[["khudkasht","khudkasht",1,["269/1"],["JK122820365635"],0.002529,0,[""],[""]]],"e":0.002529,"k":"0K-1M-0S","r":"","g":0,"u":"ea8d7950-5f5f-4001-ba88-2262e07ffc60"},{"id":20,"st":0,"v":[["salam shah","sayed zaman shah",6,["76","81","78","237","236","82"],["JK598912256431","JK597680664656","JK597059975621","JK587267091298","JK587610799542","JK595816604589"],0.267794,0,["","","","","",""],["","","","","",""]]],"e":0.267794,"k":"5K-5M-8S","r":"","g":0,"u":"e7998abc-d382-4b75-855c-ca9717c5ce89"},{"id":21,"st":0,"v":[["sakina fatima","ali akbar shah",1,["194"],["JK379293674821"],0.041733,0,[""],[""]]],"e":0.041733,"k":"0K-16M-4S","r":"","g":0,"u":"e6730e56-bfe1-47f5-9edc-e777d53e9dc9"},{"id":22,"st":0,"v":[["munir hussain shah","talib hussain shah",11,["53","44","263","298/131","271","115","132","266","260","245","232"],["JK326931002557","JK324150771915","JK304348830053","JK447728456249","JK443299635031","JK438885332202","JK407076863974","JK315433725343","JK402594004358","JK401452376656","JK328709127859"],0.305934,0,["","","","","","","","","","",""],["","","","","","","","","","",""]]],"e":0.305934,"k":"6K-1M-0S","r":"","g":1,"u":"e60eb545-325b-4d61-b2be-9e95e098a94d"},{"id":23,"st":0,"v":[["shakoor hussain","nazzeer hussain shah",2,["216","218"],["JK296798022783","JK298032232048"],0.068939,0,["",""],["",""]]],"e":0.068939,"k":"1K-7M-2S","r":"","g":0,"u":"e5f29f00-dd2c-49cd-8d51-e66b629243bc"},{"id":24,"st":0,"v":[["miskeen shah","nabar ali",5,["324/309/258","66","299/17","46","259"],["JK706039801335","JK710532888837","JK703041978075","JK701030299050","JK703787904567"],0.327363,0,["","","","",""],["","","","",""]]],"e":0.327363,"k":"6K-9M-4S","r":"","g":0,"u":"e5095b07-35fc-4941-9819-ac384a614fd6"},{"id":25,"st":0,"v":[["bashir ahmad shah","sayed hussain shah",1,["310/194/125"],["JK579421220929"],0.037939,0,[""],[""]]],"e":0.037939,"k":"0K-15M-0S","r":"","g":0,"u":"e4c72efd-295c-4874-a5b2-1556c0967bdd"},{"id":26,"st":0,"v":[["bashir hussain","ab hameed",1,["288/188"],["JK933007387394"],0.012767,0,[""],[""]]],"e":0.012767,"k":"0K-5M-0S","r":"","g":0,"u":"e1d2a10f-21dd-4768-9ed5-44c2d248e983"},{"id":27,"st":0,"v":[["mir hasan shah","suleiman shah",4,["239","238","146","240"],["JK687034521212","JK684530738119","JK688880344439","JK687824194475"],0.173232,0,["","","",""],["","","",""]]],"e":0.173232,"k":"3K-8M-4S","r":"","g":0,"u":"e1281f64-d83b-466e-a820-724f5f9e7308"},{"id":28,"st":0,"v":[["fayaz hussain shah","mohammad shah",3,["201","202","155"],["JK214359383170","JK232014409492","JK211696080909"],0.021347,0,["","",""],["","",""]]],"e":0.021347,"k":"0K-8M-4S","r":"","g":2,"u":"df224feb-7e75-4c71-b46d-af2a1cf5f5ca"},{"id":29,"st":1,"v":[["israeel shah","hussain shah",19,["5","255","292/10","102","114","119","128","130","113","101","267","112","123","100","103","103/1","121","122","138"],["JK394752694464","JK458585648242","JK448502506402","JK451192416721","JK463551534474","JK465052546475","JK466990236775","JK468057617538","JK471945813123","JK447855822055","JK469315439673","JK462324450834","JK471089273924","JK472704458776","JK446737034830","JK460420119434","JK449364480318","JK452453187972","JK455948599338"],0.74446,0,["","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","",""]],["israil shah","hussain shah",1,["99"],["JK518134483597"],0.050072,1,[""],[""]]],"e":0.794532,"k":"15K-14M-1S","r":"","g":0,"u":"dc21e89b-a401-4bac-8e16-f6186e137f05"},{"id":30,"st":2,"v":[["sayed aslam shah","mehroom mehrban shah",4,["60/1","59","256","257"],["JK187715243448","JK186327966343","JK189196723631","JK190801870046"],0.003795,0,["","","",""],["","","",""]],["sayed aslam shah","mehrban shah",1,["97"],["JK298090329100"],0.000632,2,[""],[""]]],"e":0.004427,"k":"0K-1M-7S","r":"1 plot(s) with zero extent","g":0,"u":"dbb84948-9ec0-41c8-bf25-5f8a2000683c"},{"id":31,"st":0,"v":[["anees fatima","mzml shah",5,["299/17","259","46","324/309/258","66"],["JK703044331420","JK703787987783","JK701032035878","JK706041124628","JK710536834493"],0.327364,0,["","","","",""],["","","","",""]]],"e":0.327364,"k":"6K-9M-4S","r":"","g":0,"u":"db7f0e94-88ad-4053-a1cf-c243a5ead34f"},{"id":32,"st":0,"v":[["zalekhan begum","miskeen",3,["176","220","150"],["JK602783857914","JK603801251590","JK598304537301"],0.063232,0,["","",""],["","",""]]],"e":0.063232,"k":"1K-5M-0S","r":"","g":0,"u":"dae98ea7-1e0b-4b76-b80a-7d62781dede6"},{"id":33,"st":0,"v":[["rukia fatima","ali akbar shah",1,["194"],["JK379293618285"],0.041733,0,[""],[""]]],"e":0.041733,"k":"0K-16M-4S","r":"","g":0,"u":"dac806f2-57a3-46ad-81d5-c63292b0d5f2"},{"id":34,"st":0,"v":[["azam shah","yousuf shah",1,["293/125"],["JK566662472092"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"dac08f27-9747-45b8-bcd4-034a2fcde6b9"},{"id":35,"st":0,"v":[["safeer hussain shah","rafi uddin shah",9,["166","162","305/152/1","161/1","163/1","154","163","170","167"],["JK389454950282","JK358916342447","JK344027852030","JK361653954465","JK362963706033","JK388136390772","JK355256465607","JK360674047768","JK390520667512"],0.178126,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.178126,"k":"3K-10M-4S","r":"","g":0,"u":"d91876c5-6cad-4fb8-84f9-e223768ec3bd"},{"id":36,"st":0,"v":[["taslim fatima","noor ahmad shah",4,["148","14","11","15"],["JK270174993859","JK184391217528","JK182545816565","JK185992735242"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"d8491d13-b80f-4a63-a5ed-1233c5e2f85b"},{"id":37,"st":0,"v":[["fatima noor","akbar ali shah",9,["46","120","22","93/1","116","67","324/309/258","299/17","66"],["JK701039707476","JK648837791239","JK643702167751","JK641019601611","JK638483995521","JK255478031010","JK706042845422","JK703050096248","JK710542149446"],0.129967,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.129967,"k":"2K-11M-3S","r":"","g":0,"u":"d6ccde3e-41c1-415f-ac53-9fdfec41d922"},{"id":38,"st":0,"v":[["miskeen fatima","hussain shah",1,["99"],["JK518138440322"],0.009402,0,[""],[""]]],"e":0.009402,"k":"0K-3M-6S","r":"","g":0,"u":"d4f2fcc3-86dd-44d4-ae63-03eda23a5235"},{"id":39,"st":0,"v":[["rahmat shah","rakeeb shah",6,["193","287/188","192","203","204","289"],["JK927040786695","JK959417238144","JK961462418493","JK963056504863","JK971610433768","JK974142862430"],0.056365,0,["","","","","",""],["","","","","",""]]],"e":0.056365,"k":"1K-2M-3S","r":"","g":0,"u":"d3017098-b3f4-42b7-8cce-0833070be103"},{"id":40,"st":0,"v":[["gazi shah","sayed ilm shah",2,["145","147"],["JK707009736650","JK703984041517"],0.121406,0,["",""],["",""]]],"e":0.121406,"k":"2K-8M-0S","r":"","g":0,"u":"d2e30806-16e7-4bc4-b089-c619e8bd255e"},{"id":41,"st":0,"v":[["masmat fatimah","mohammad shah",3,["151","217","211"],["JK286168695237","JK199689884704","JK287404628587"],0.068299,0,["","",""],["","",""]]],"e":0.068299,"k":"1K-7M-0S","r":"","g":3,"u":"d1bd096c-fbdc-4b2a-8f8d-40958b7b6994"},{"id":42,"st":0,"v":[["ali haider","gulam haider shah",1,["152"],["JK283354229308"],0.091054,0,[""],[""]]],"e":0.091054,"k":"1K-16M-0S","r":"","g":0,"u":"cdbccd7a-d526-4611-85ea-35d7d4e341ce"},{"id":43,"st":0,"v":[["masmat arifa fatima","nazzeer hussain shah",2,["218","216"],["JK298032725885","JK296798124629"],0.001092,0,["",""],["",""]]],"e":0.001092,"k":"0K-0M-4S","r":"","g":0,"u":"cb62d469-4658-49d2-9556-1eaad2d9dfe6"},{"id":44,"st":0,"v":[["nasreen fatima","gulam mohi uddin shah",1,["305/152/1"],["JK344023852196"],0.005586,0,[""],[""]]],"e":0.005586,"k":"0K-2M-2S","r":"","g":0,"u":"caa18b68-b3d0-47fd-9133-0801cd808518"},{"id":45,"st":0,"v":[["saleem shah","nazzeer ahmad shah",5,["163/1","170","161/1","162","163"],["JK362968459033","JK360675427467","JK361656196525","JK358920416875","JK355261407698"],0.269052,0,["","","","",""],["","","","",""]]],"e":0.269052,"k":"5K-6M-3S","r":"","g":0,"u":"c9e4561a-49b4-4ac5-92e1-f5a1008f67a8"},{"id":46,"st":0,"v":[["mir hussain","nazzeer hussain shah",2,["216","218"],["JK296796501319","JK298029070497"],0.068939,0,["",""],["",""]]],"e":0.068939,"k":"1K-7M-2S","r":"","g":0,"u":"c92f5f7e-8a0f-45d7-8702-8e2efa7cd47f"},{"id":47,"st":0,"v":[["mohammad alam shah","mubarak shah",2,["71","72"],["JK713662661057","JK714247088167"],0.136581,0,["",""],["",""]]],"e":0.136581,"k":"2K-14M-0S","r":"","g":0,"u":"c80e2980-6932-4825-b319-a2267c34ef47"},{"id":48,"st":0,"v":[["p w d","p w d",1,["264"],["JK318263864416"],0.002529,0,[""],[""]]],"e":0.002529,"k":"0K-1M-0S","r":"","g":0,"u":"c65b5042-8d7a-4439-963f-c1f56431ad7e"},{"id":49,"st":0,"v":[["yousuf shah","samundar shah",7,["127","311/294","310/194/125","117","126","125/1","250"],["JK497523236552","JK507484966433","JK579421768850","JK491725710837","JK501348117386","JK511684235384","JK513372997696"],0.24803,0,["","","","","","",""],["","","","","","",""]]],"e":0.24803,"k":"4K-18M-1S","r":"","g":0,"u":"c5e55ed7-ccf0-4594-be64-1535cc1d1417"},{"id":50,"st":0,"v":[["munir hussain shah","yousuf shah",1,["293/125"],["JK566669613156"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"c409197c-7fb4-4080-bcf5-a02d93074e5b"},{"id":51,"st":0,"v":[["bashsrit hussain","ab hameed",1,["288/188"],["JK933010922466"],0.013405,0,[""],[""]]],"e":0.013405,"k":"0K-5M-3S","r":"","g":0,"u":"c4059058-3fa2-4954-bfab-86a6b246e3b9"},{"id":52,"st":0,"v":[["yaseen shah","gulam haider shah",1,["152"],["JK283354726852"],0.113818,0,[""],[""]]],"e":0.113818,"k":"2K-5M-0S","r":"","g":0,"u":"c319f3f2-2612-4f67-8011-2c91f2335329"},{"id":53,"st":0,"v":[["gulam fatima","noor ahmad shah",4,["11","148","14","15"],["JK182546956593","JK270175696842","JK184392056720","JK185994099200"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"c2764d97-f483-4dac-a7fd-80f7e86a8dab"},{"id":54,"st":0,"v":[["khaleek ahmad shah","imam ali shah",8,["67","66","46","324/309/258","299/17","116","93/1","22"],["JK255457739448","JK710537097914","JK701034164176","JK706041301635","JK703044651903","JK638477795550","JK641016611504","JK643697626895"],0.092352,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.092352,"k":"1K-16M-5S","r":"","g":0,"u":"bede9256-31a8-4691-b7b8-cb4e89791424"},{"id":55,"st":0,"v":[["nizar ahmad shah","akbar ali shah",8,["46","324/309/258","66","22","93/1","299/17","116","67"],["JK701035580190","JK706041931535","JK710539971916","JK643700667699","JK641018694064","JK703047815555","JK638480256682","JK255471344424"],0.092445,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.092445,"k":"1K-16M-5S","r":"","g":0,"u":"bd8d5cff-fa55-4af0-ac96-636598556c19"},{"id":56,"st":0,"v":[["mukaddas fatima","hussain shah",1,["99"],["JK518138200033"],0.02503,0,[""],[""]]],"e":0.02503,"k":"0K-9M-8S","r":"","g":0,"u":"bc2ab932-af08-4e01-aa59-caa42cf364fb"},{"id":57,"st":0,"v":[["fareeda fatima","mohammad shah",3,["155","201","202"],["JK211698331929","JK214362899297","JK232017699614"],0.009005,0,["","",""],["","",""]]],"e":0.009005,"k":"0K-3M-5S","r":"","g":3,"u":"bc0aa793-82be-4c59-b903-5f64e73d3663"},{"id":58,"st":0,"v":[["manir hussain","ab hameed",1,["288/188"],["JK933010314306"],0.013405,0,[""],[""]]],"e":0.013405,"k":"0K-5M-3S","r":"","g":0,"u":"bae5ef70-57af-46e3-8f68-46b00ba66117"},{"id":59,"st":0,"v":[["masmat fareed fatima","mehmood shah",6,["289","203","192","204","193","287/188"],["JK974146186891","JK963060998826","JK961465571746","JK971619210726","JK927045881394","JK959421382080"],0.057341,0,["","","","","",""],["","","","","",""]]],"e":0.057341,"k":"1K-2M-6S","r":"","g":0,"u":"b90b72da-f663-4222-9b92-280170c17750"},{"id":60,"st":0,"v":[["raheem shah","sayed alam shah",10,["53","44","263","132","232","245","260","266","115","271"],["JK326928903956","JK324148674182","JK304347233768","JK407074508270","JK328706753880","JK401451991106","JK402593900205","JK315432996254","JK438882075408","JK443297431521"],0.478711,0,["","","","","","","","","",""],["","","","","","","","","",""]]],"e":0.478711,"k":"9K-9M-2S","r":"","g":0,"u":"b8c1d86e-e9da-4ffe-b0c1-cc640638b2bf"},{"id":61,"st":0,"v":[["nishada begum","miskeen",4,["150","220","221","176"],["JK598304916177","JK603801533814","JK617887321827","JK602784004672"],0.13911,0,["","","",""],["","","",""]]],"e":0.13911,"k":"2K-15M-0S","r":"","g":0,"u":"b7d420e1-0777-41d1-9dcf-4360d4219e1f"},{"id":62,"st":0,"v":[["masmat ha jaran","sarwar shah",5,["70","69","80","77","75"],["JK262058471914","JK259848405001","JK263076124052","JK262751912919","JK582500343811"],0.169527,0,["","","","",""],["","","","",""]]],"e":0.169527,"k":"3K-7M-0S","r":"","g":4,"u":"b718e9b8-697d-4ec4-bd93-751a6952925e"},{"id":63,"st":0,"v":[["bashir hussain shah","hussain shah",2,["293/125","26"],["JK566660188419","JK517548471838"],0.046286,0,["",""],["",""]]],"e":0.046286,"k":"0K-18M-3S","r":"","g":0,"u":"b56ddcc8-85e0-4156-adc2-37089cd2adf4"},{"id":64,"st":0,"v":[["gulam fatima","sayed hussain shah",1,["310/194/125"],["JK579421748273"],0.037939,0,[""],[""]]],"e":0.037939,"k":"0K-15M-0S","r":"","g":0,"u":"b4f0b99c-9051-45f5-9926-548d7936f008"},{"id":65,"st":0,"v":[["salam shah","mohammad shah",4,["146","238","239","240"],["JK688877809960","JK684529509841","JK687032528719","JK687820426062"],0.173232,0,["","","",""],["","","",""]]],"e":0.173232,"k":"3K-8M-4S","r":"","g":0,"u":"b438d37e-b9f6-4dfa-8229-258456dfd396"},{"id":66,"st":0,"v":[["nazir hussain shah","sarwar shah",7,["70","77","69","79","80","75","76"],["JK262051365689","JK262748750111","JK259847988702","JK594304056154","JK263076054488","JK582499851937","JK598907504637"],0.231975,0,["","","","","","",""],["","","","","","",""]]],"e":0.231975,"k":"4K-11M-6S","r":"","g":0,"u":"b1ca1300-f4d7-4404-bf5a-3d2465c8c5ea"},{"id":67,"st":0,"v":[["ali haider","ali akbar shah",1,["194"],["JK379293242941"],0.041733,0,[""],[""]]],"e":0.041733,"k":"0K-16M-4S","r":"","g":0,"u":"b06b6d17-e42f-4541-a8ae-861ddc35cd56"},{"id":68,"st":0,"v":[["arif hussain","nizar ahmad shah",4,["256","257","59","60/1"],["JK189201310692","JK190804078950","JK186329251305","JK187718702815"],0.003795,0,["","","",""],["","","",""]]],"e":0.003795,"k":"0K-1M-5S","r":"1 plot(s) with zero extent","g":0,"u":"b0422002-baf8-4a91-a5ff-edf7f94dfd04"},{"id":69,"st":0,"v":[["rahmat shah","ali akbar shah",14,["29","243","253","251","30","252","33","32","281","247","56 min","242","34","31"],["JK500874142897","JK500036965523","JK515602713526","JK515164974651","JK514265885393","JK513844079503","JK512960150217","JK512484818826","JK511333896476","JK509892651164","JK509414006747","JK509127579776","JK508111041079","JK501671438456"],1.34558,0,["","","","","","","","","","","","","",""],["","","","","","","","","","","","","",""]]],"e":1.34558,"k":"26K-12M-0S","r":"","g":0,"u":"ae940a91-1088-4cc7-b6e3-4cfb21f52eca"},{"id":70,"st":0,"v":[["muzaffar shah","sayed zaman shah",12,["234","235","9","241","61","62","65","139","111","137","140","233"],["JK738628787309","JK740330328475","JK722713193589","JK710391423264","JK725406973844","JK726692092709","JK727942468009","JK764680193665","JK734688173499","JK762922558292","JK736520497999","JK761889168126"],1.408367,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]]],"e":1.408367,"k":"27K-16M-7S","r":"","g":0,"u":"ac578c71-7eaa-4524-ac6d-4f7a5cfa17f8"},{"id":71,"st":0,"v":[["bashir hussain shah","noor ahmad shah",4,["148","15","11","14"],["JK270174835493","JK185992104937","JK182545270309","JK184389960173"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"ac22d9df-90f4-41cc-bb0e-c6b37a69ad5e"},{"id":72,"st":0,"v":[["fiyaz hussain shah","mohammad shah",3,["151","217","211"],["JK286165996573","JK199689585045","JK287403027750"],0.081587,0,["","",""],["","",""]]],"e":0.081587,"k":"1K-12M-2S","r":"","g":2,"u":"ab205687-6e8a-418a-83bc-4e165f8518d2"},{"id":73,"st":0,"v":[["mehboob hussain","masmat haseen fatima",3,["271","115","307/144"],["JK443304309636","JK438892385818","JK453127020110"],0.375361,0,["","",""],["","",""]]],"e":0.375361,"k":"7K-8M-4S","r":"","g":0,"u":"aa53aac0-95f5-4e9a-afe8-ffce05daf438"},{"id":74,"st":0,"v":[["raheem shah","psyed alam shah",1,["264"],["JK318262050769"],0.03541,0,[""],[""]]],"e":0.03541,"k":"0K-14M-0S","r":"","g":0,"u":"a996b28a-35b4-488c-8c93-d3c964749e9e"},{"id":75,"st":0,"v":[["ali akbar shah","noor ahmed shah",8,["22","93/1","116","67","46","324/309/258","66","299/17"],["JK643706175014","JK641026274604","JK638488186377","JK255491966278","JK701044068533","JK706044806487","JK710545688779","JK703051720296"],0.091872,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.091872,"k":"1K-16M-3S","r":"","g":0,"u":"a6b75d47-1170-465f-a4fe-4a411574b766"},{"id":76,"st":0,"v":[["muzmil shah","hasan ali shah",6,["127","126","117","311/294","250","125/1"],["JK497514993920","JK501343202156","JK491714592510","JK507479499184","JK513366667707","JK511679724024"],0.096745,0,["","","","","",""],["","","","","",""]]],"e":0.096745,"k":"1K-18M-2S","r":"","g":0,"u":"a587be1a-9345-4d30-9365-5fba542e0c1b"},{"id":77,"st":0,"v":[["yousuf shah","inayat ulla shah",19,["59","248","249","60/1","256","96","39","89","282","251/1","257","38","246","97","90","49","278","2","214"],["JK186335200626","JK123410733622","JK124178907797","JK187723277797","JK189205125775","JK250968336693","JK171983396340","JK249734571809","JK125550772558","JK124935743415","JK190808804452","JK171232428646","JK126631397729","JK298099506213","JK179342274905","JK174604484959","JK126208989372","JK173801620896","JK172997630783"],0.900855,0,["","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","",""]]],"e":0.900855,"k":"17K-16M-2S","r":"1 plot(s) with zero extent","g":0,"u":"a489292a-72b3-41dd-add4-6ebb344fa0ed"},{"id":78,"st":0,"v":[["gulam hussain shah","noor shah",7,["11","15","148","153","218","216","14"],["JK182547533678","JK185995327432","JK270179595202","JK249466794188","JK298029027370","JK296796133565","JK184392617973"],0.563073,0,["","","","","","",""],["","","","","","",""]]],"e":0.563073,"k":"11K-2M-6S","r":"","g":0,"u":"a3de1f42-efe8-4653-90e4-02338dff897e"},{"id":79,"st":3,"v":[["alam hussain shah","sayed hussain shah",10,["272/1","274","44","53","232","115","271","272","273","261"],["JK439512917562","JK340139796719","JK324145130311","JK326927925966","JK328704204909","JK438876443762","JK443291465514","JK332211194589","JK339168774525","JK344502141202"],0.417252,0,["","","","","","","","","",""],["","","","","","","","","",""]],["alam hussain shah","sayed hassan shah",3,["244","3","262"],["JK392940243077","JK302224809667","JK395148266559"],0.128574,3,["","",""],["","",""]]],"e":0.545826,"k":"10K-15M-7S","r":"","g":0,"u":"a37eab01-6c66-46e6-8a2e-b1905d8d47a8"},{"id":80,"st":0,"v":[["syed akbar shah","raheem shah",1,["298/131"],["JK447730589988"],0.05438,0,[""],[""]]],"e":0.05438,"k":"1K-1M-5S","r":"","g":0,"u":"9f84be12-0b15-4099-8c01-aa7d6cbb9238"},{"id":81,"st":0,"v":[["hasan shah","gazi shah",6,["117","311/294","250","127","125/1","126"],["JK491714389176","JK507479465773","JK513365995110","JK497514771425","JK511678774268","JK501339979046"],0.220757,0,["","","","","",""],["","","","","",""]]],"e":0.220757,"k":"4K-7M-3S","r":"","g":0,"u":"9e5a4c8e-77f0-477e-83af-85cfd326b7e6"},{"id":82,"st":0,"v":[["naseer hussain shah","rafi uddin shah",9,["161/1","163/1","154","166","167","162","305/152/1","170","163"],["JK361653964332","JK362963773562","JK388137891216","JK389455198297","JK390522314096","JK358919018489","JK344028460721","JK360674905515","JK355257177471"],0.178126,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.178126,"k":"3K-10M-4S","r":"","g":0,"u":"9d940670-19d9-48ea-80b9-c8f0b7373d1d"},{"id":83,"st":0,"v":[["nazir fatima","gulam haider shah",1,["152"],["JK283356657398"],0.111289,0,[""],[""]]],"e":0.111289,"k":"2K-4M-0S","r":"","g":0,"u":"9d02e684-5849-40d2-a515-014f7d722dbf"},{"id":84,"st":0,"v":[["sayed akbar shah","sayed alam shah",1,["263"],["JK304346275023"],0.07904,0,[""],[""]]],"e":0.07904,"k":"1K-11M-2S","r":"","g":0,"u":"9b4121df-a7c6-4af7-a65c-41425c4fc24b"},{"id":85,"st":0,"v":[["aslam shah","gulam hussain shah",2,["161","165"],["JK341755799097","JK377206639485"],0.185902,0,["",""],["",""]]],"e":0.185902,"k":"3K-13M-4S","r":"","g":0,"u":"97c4506e-7062-4891-83e3-667fa0ecebf2"},{"id":86,"st":0,"v":[["saeed fatima","nazir ahmad shah",1,["97"],["JK298095757675"],0.000037,0,[""],[""]]],"e":0.000037,"k":"0K-0M-0S","r":"","g":0,"u":"97883d9d-47c1-4c11-96e0-e7073cb89b95"},{"id":87,"st":0,"v":[["rahmat noor","abdul rehman",2,["145","147"],["JK707009467435","JK703982450255"],0.121406,0,["",""],["",""]]],"e":0.121406,"k":"2K-8M-0S","r":"","g":0,"u":"97769284-0b66-44b1-89fc-3c9274f96cb4"},{"id":88,"st":0,"v":[["khurshid hussain shah","mohammad shah",6,["217","201","151","211","155","202"],["JK199688410116","JK214358264265","JK286163833261","JK287402857275","JK211695910503","JK232011524980"],0.102934,0,["","","","","",""],["","","","","",""]]],"e":0.102934,"k":"2K-0M-6S","r":"","g":0,"u":"96a6ebfc-8b5a-4793-a921-e29e0cbaebd9"},{"id":89,"st":0,"v":[["anyat ulla shah","syed mir shah",1,["325/309/258"],["JK707066862053"],0.063232,0,[""],[""]]],"e":0.063232,"k":"1K-5M-0S","r":"","g":0,"u":"94bda7c0-855b-4d7e-9b11-e03e522419a2"},{"id":90,"st":0,"v":[["sayed gulam shah","sayed mir shah",21,["35","54","270","129","115","136","36","8","283","134","195","141","135","106/1","106","105","37","271","280","143","230"],["JK419791678070","JK414418943294","JK448881020581","JK428624055299","JK438886820610","JK429839661969","JK412281728727","JK419113038528","JK416915387326","JK427832804697","JK426031716334","JK425314675477","JK423931448641","JK421254213245","JK420723898879","JK420307380669","JK413103001707","JK443301750271","JK415365886417","JK666106987528","JK418591081401"],0.719582,0,["","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","",""]]],"e":0.719582,"k":"14K-4M-5S","r":"","g":0,"u":"932ecf0b-bdc0-4336-ba51-be55c8975f71"},{"id":91,"st":0,"v":[["zainab noor","suleiman shah",4,["146","238","239","240"],["JK688882221153","JK684532733574","JK687035127775","JK687824563354"],0.173382,0,["","","",""],["","","",""]]],"e":0.173382,"k":"3K-8M-5S","r":"","g":0,"u":"92e92203-25f8-4e96-b7a4-e4f7a2bbf4e6"},{"id":92,"st":0,"v":[["masmat gori","sayed zaman shah",6,["76","82","81","237","236","78"],["JK598916658908","JK595818720473","JK597682982240","JK587267701537","JK587612355187","JK597060993734"],0.268212,0,["","","","","",""],["","","","","",""]]],"e":0.268212,"k":"5K-6M-0S","r":"","g":0,"u":"927fb20d-0705-4161-9f87-492e69eef263"},{"id":93,"st":0,"v":[["mubarak shah","murad shah",6,["73","77","69","13","70","80"],["JK580142605830","JK262761787865","JK259854413601","JK579776181569","JK262065357103","JK263080736302"],1.203942,0,["","","","","",""],["","","","","",""]]],"e":1.203942,"k":"23K-16M-0S","r":"","g":0,"u":"91c74aa0-dd6f-462e-9f7d-466ba380b05e"},{"id":94,"st":2,"v":[["ali haider shah","raqub shah",18,["283","280","54","36","37","106/1","106","105","8","230","135","141","195","134","143","35","136","129"],["JK416916704083","JK415366639149","JK414420046485","JK412282134809","JK413103509957","JK421254915758","JK420724022076","JK420310246899","JK419113220480","JK418591389096","JK423932641602","JK425317047607","JK426031861789","JK427833623056","JK666107954373","JK419792097996","JK429840635260","JK428624074097"],0.32169,0,["","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","",""]],["ali haider","raqub shah",3,["271","307/144","115"],["JK443301786763","JK453126798032","JK438888237760"],0.083763,2,["","",""],["","",""]]],"e":0.405453,"k":"8K-0M-3S","r":"","g":0,"u":"8f454cf9-f4c3-49e4-8a77-6bd3613b75db"},{"id":95,"st":0,"v":[["aslam shah","nazzeer ahmad shah",3,["166","167","154"],["JK389456239012","JK390524688674","JK388138773287"],0.142272,0,["","",""],["","",""]]],"e":0.142272,"k":"2K-16M-2S","r":"","g":0,"u":"8c5fe6fe-1545-4629-ac0c-deab6e137cb6"},{"id":96,"st":0,"v":[["altaf hussain shah","yousuf shah",1,["293/125"],["JK566662133196"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"8b86e0c8-08c0-4708-99ff-fd5ef1813aad"},{"id":97,"st":0,"v":[["hajraan","sarwar shah",2,["76","79"],["JK598910100620","JK594305205664"],0.062448,0,["",""],["",""]]],"e":0.062448,"k":"1K-4M-6S","r":"","g":4,"u":"8b45b015-250b-4fa9-b7cf-2beae241e3ef"},{"id":98,"st":0,"v":[["shakeel ahmad shah","akbar ali shah",8,["116","22","66","299/17","46","324/309/258","67","93/1"],["JK638480108159","JK643700376394","JK710539623543","JK703044862575","JK701035373225","JK706041842744","JK255468153354","JK641018445473"],0.11015,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.11015,"k":"2K-3M-5S","r":"","g":0,"u":"8aed547a-a7ac-4b24-b09b-69cad0de7538"},{"id":99,"st":0,"v":[["mzml shah","habib noor",11,["233","61","9","62","111","235","139","137","65","140","234"],["JK761894179994","JK725412883322","JK722718965393","JK726695318088","JK734693004632","JK740332214206","JK764684039076","JK762924066710","JK727945888048","JK736522314827","JK738632239472"],0.372567,0,["","","","","","","","","","",""],["","","","","","","","","","",""]]],"e":0.372567,"k":"7K-7M-3S","r":"","g":0,"u":"8a930d53-509c-4c12-9975-8e8869e7aa7f"},{"id":100,"st":0,"v":[["sarwar noor","suleiman shah",4,["146","240","238","239"],["JK688881674811","JK687824273542","JK684531613434","JK687034975019"],0.173232,0,["","","",""],["","","",""]]],"e":0.173232,"k":"3K-8M-4S","r":"","g":0,"u":"8a5ea83b-f458-452a-9c86-e9fcab1061ff"},{"id":101,"st":0,"v":[["masmat fathi","samundar shah",6,["127","125/1","126","117","311/294","250"],["JK497518422688","JK511684093720","JK501345602081","JK491718045506","JK507484895240","JK513372831276"],0.095321,0,["","","","","",""],["","","","","",""]]],"e":0.095321,"k":"1K-17M-6S","r":"","g":0,"u":"89f269cf-b33b-4459-b45d-730fcc513087"},{"id":102,"st":0,"v":[["gulam yakhya","miskeen",3,["220","150","176"],["JK603800584231","JK598300460747","JK602781850332"],0.106231,0,["","",""],["","",""]]],"e":0.106231,"k":"2K-2M-0S","r":"","g":0,"u":"85c48be2-a6e6-4d68-9890-a56dac73dd0f"},{"id":103,"st":0,"v":[["mir hussain","nazzeer ahmad shah",5,["148","11","14","15","153"],["JK270180865106","JK182547878459","JK184392807062","JK185996766823","JK249466939173"],0.19108,0,["","","","",""],["","","","",""]]],"e":0.19108,"k":"3K-15M-5S","r":"","g":0,"u":"8498e32a-0f1a-47ac-94fe-71f95d43df46"},{"id":104,"st":0,"v":[["yasin shah","matloob shah",17,["48","1","153/1","154/1","20","85","179","181","187","97","60/1","256","47","257","59","269","268/1"],["JK196283066542","JK956942745381","JK966987867300","JK970078709178","JK963103451356","JK965074844771","JK970808899335","JK974558552537","JK978192271617","JK298084900488","JK187712412451","JK189190312170","JK192204371782","JK190794732738","JK186325342645","JK253679922332","JK971955470273"],0.120643,0,["","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","",""]]],"e":0.120643,"k":"2K-7M-6S","r":"1 plot(s) with zero extent","g":0,"u":"81375faa-057f-4aad-a23b-5f8cb546c5ec"},{"id":105,"st":0,"v":[["masmat nargis","rafi uddin shah",9,["162","167","305/152/1","170","163","161/1","163/1","154","166"],["JK358919895118","JK390522776984","JK344028777968","JK360675317644","JK355260038777","JK361654439043","JK362965170916","JK388138245467","JK389455383165"],0.161364,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.161364,"k":"3K-3M-7S","r":"","g":0,"u":"81239c1b-e8e9-4176-bfc2-884de61b4414"},{"id":106,"st":0,"v":[["haider shah","inayat ulla shah",19,["278","251/1","97","96","90","246","248","249","38","39","214","60/1","256","257","89","282","2","49","59"],["JK126209365529","JK124935785635","JK298100687511","JK250974731617","JK179343413414","JK126631413959","JK123410925853","JK124179867860","JK171232912785","JK171983599770","JK172999195164","JK187725539107","JK189207015452","JK190808974786","JK249736502293","JK125551073434","JK173802570381","JK174604609165","JK186335254335"],0.900268,0,["","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","",""]]],"e":0.900268,"k":"17K-15M-8S","r":"1 plot(s) with zero extent","g":0,"u":"7d9747d4-908d-4f4d-b437-72d226ff032a"},{"id":107,"st":0,"v":[["masmat nageen fatima","noor ahmad shah",4,["148","15","14","11"],["JK270174882521","JK185992183269","JK184390702316","JK182545677357"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"7cc645e3-da06-46a2-9622-f98ac144ec54"},{"id":108,"st":0,"v":[["shafeeq fatima","gulam mohi uddin shah",1,["305/152/1"],["JK344021889115"],0.005586,0,[""],[""]]],"e":0.005586,"k":"0K-2M-2S","r":"","g":0,"u":"7b7c5525-5c1f-4b4b-ae75-3ea12196541f"},{"id":109,"st":0,"v":[["shamim hussain shah","akbar ali shah",6,["254/1","138/1","297/130","302/68","120","254"],["JK664989649783","JK663185762615","JK662499717698","JK661294985173","JK648836440571","JK663684208481"],0.112958,0,["","","","","",""],["","","","","",""]]],"e":0.112958,"k":"2K-4M-6S","r":"","g":0,"u":"7b014f9b-58c0-4140-b12e-7ab31130bbc3"},{"id":110,"st":0,"v":[["gulam mustafa","miskeen",3,["220","150","176"],["JK603799279195","JK598299453322","JK602780746999"],0.106231,0,["","",""],["","",""]]],"e":0.106231,"k":"2K-2M-0S","r":"","g":0,"u":"79aa24ce-3820-4684-a336-f96e5571b57f"},{"id":111,"st":0,"v":[["asraail shah","hussain shah",6,["126","117","125/1","250","127","311/294"],["JK501344849266","JK491717525742","JK511683690732","JK513371948866","JK497518375805","JK507484846296"],0.036497,0,["","","","","",""],["","","","","",""]]],"e":0.036497,"k":"0K-14M-4S","r":"","g":0,"u":"76c3a4ad-602c-44e6-a89a-5048901169ba"},{"id":112,"st":3,"v":[["safdar ali shah","sayed hussain shah",9,["232","53","18/1","261","271","109","110","44","115"],["JK328705040234","JK326928128798","JK333324465834","JK344502489290","JK443292710301","JK334685440055","JK335609951079","JK324146619076","JK438877478970"],0.248114,0,["","","","","","","","",""],["","","","","","","","",""]],["safdar ali shah","sayed hassan shah",3,["262","244","3"],["JK395148603442","JK392941387067","JK302225539593"],0.128574,3,["","",""],["","",""]],["safdar ali shah","hassan shah",1,["295/17"],["JK299851817538"],0.14164,3,[""],[""]]],"e":0.518328,"k":"10K-4M-8S","r":"","g":0,"u":"754f21c7-723a-4588-8639-940e1be3cf11"},{"id":113,"st":0,"v":[["karim haider shah","mohammad ali shah",3,["11","15","14"],["JK182541168857","JK185986126067","JK184388136702"],0.209033,0,["","",""],["","",""]]],"e":0.209033,"k":"4K-2M-6S","r":"","g":0,"u":"74f80298-7d08-47b9-abd4-5e29ff43d356"},{"id":114,"st":0,"v":[["sikandar shah","mohammad shah",4,["146","238","239","240"],["JK688877244551","JK684528916733","JK687032470544","JK687820348304"],0.173232,0,["","","",""],["","","",""]]],"e":0.173232,"k":"3K-8M-4S","r":"","g":0,"u":"74e21876-48d5-4bd9-8076-3c4de9d02cd4"},{"id":115,"st":0,"v":[["sarwar noor","mohammad shah",6,["155","202","151","211","217","201"],["JK211700056710","JK232018281739","JK286168807373","JK287406194475","JK199691163218","JK214364561399"],0.065346,0,["","","","","",""],["","","","","",""]]],"e":0.065346,"k":"1K-5M-8S","r":"","g":0,"u":"73fe8dbe-2bd9-4786-b2c8-8d719cbf5ea0"},{"id":116,"st":0,"v":[["mumtaz hussain shah","talib hussain shah",12,["263","132","44","271","298/131","53","232","245","260","266","264","115"],["JK304348866634","JK407077149864","JK324152031160","JK443300399975","JK447729073686","JK326931074041","JK328710373792","JK401453065517","JK402594369510","JK315434072756","JK318259927140","JK438885740625"],0.324037,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]]],"e":0.324037,"k":"6K-8M-1S","r":"","g":0,"u":"73d676c4-fa96-437f-975e-648bfceb89f0"},{"id":117,"st":0,"v":[["masmat mehnaz fatma","ali akbar shah",1,["194"],["JK379292447601"],0.041733,0,[""],[""]]],"e":0.041733,"k":"0K-16M-4S","r":"","g":0,"u":"733f9acc-8e54-4bed-a34d-b840bedf8dac"},{"id":118,"st":0,"v":[["mehboob shah","sayed akbar shah",6,["232","44","265","53","7","27"],["JK328708013694","JK324149538494","JK341978999127","JK326929765086","JK305500770371","JK343018895210"],0.533364,0,["","","","","",""],["","","","","",""]]],"e":0.533364,"k":"10K-10M-8S","r":"","g":0,"u":"73154dfb-2c91-4292-999c-931330e3f6e4"},{"id":119,"st":0,"v":[["gulshan begum","ali akbar shah",3,["57","56","55"],["JK516707637319","JK516537075261","JK516280890309"],0.161874,0,["","",""],["","",""]]],"e":0.161874,"k":"3K-4M-0S","r":"","g":0,"u":"71e82657-269a-46bc-b496-e0be9df5abf1"},{"id":120,"st":2,"v":[["sayed ahmad shah","abdul hamid shah",12,["20","85","153/1","154/1","268/1","47","181","187","269","48","179","1"],["JK963097106898","JK965071921645","JK966981937985","JK970073709168","JK971950505284","JK192198136494","JK974530324415","JK978177850822","JK253663208174","JK196279936596","JK970797559980","JK956937668280"],0.637622,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]],["sayed ahmad shah","abdul hamid",5,["59","60/1","256","257","97"],["JK186324083427","JK187706844450","JK189188252592","JK190788708140","JK298081176228"],0.032933,2,["","","","",""],["","","","",""]]],"e":0.670555,"k":"13K-5M-1S","r":"","g":0,"u":"7102cf52-1009-4a1f-900a-808b09095125"},{"id":121,"st":0,"v":[["sheereen fatima","gulam haider shah",1,["152"],["JK283354929488"],0.113818,0,[""],[""]]],"e":0.113818,"k":"2K-5M-0S","r":"","g":0,"u":"6f6c7564-409b-4a55-9bc6-5d711fe36954"},{"id":122,"st":0,"v":[["maroof bahgm","miskeen",4,["150","176","220","221"],["JK598303504836","JK602783066105","JK603800661901","JK617885811441"],0.16061,0,["","","",""],["","","",""]]],"e":0.16061,"k":"3K-3M-5S","r":"","g":0,"u":"6f632f60-250c-4813-8e4f-392bd6e85159"},{"id":123,"st":0,"v":[["yasin shah","sayed zaman shah",6,["236","78","82","237","81","76"],["JK587611459879","JK597060739490","JK595817998841","JK587267610591","JK597682371258","JK598915625784"],0.26811,0,["","","","","",""],["","","","","",""]]],"e":0.26811,"k":"5K-6M-0S","r":"","g":0,"u":"6e895eea-ff57-49d9-bbb9-33b364b1aee9"},{"id":124,"st":1,"v":[["muzmil shah","ibrahim shah",12,["3","44","53","232","133","244","271","276","275","115","261","262"],["JK302226016567","JK324147515230","JK326928481876","JK328706210417","JK336954394067","JK392943873956","JK443295815001","JK444330890491","JK443876113824","JK438881813221","JK344503691162","JK395151049325"],0.953385,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]],["mazmil shah","ibrahim shah",2,["262","244"],["JK395152010120","JK392944751220"],0.361689,1,["",""],["",""]]],"e":1.315074,"k":"25K-19M-8S","r":"","g":0,"u":"6e635b48-4822-4611-a736-c3bfa577ebfe"},{"id":125,"st":0,"v":[["noor hussain shah","mehmood shah",6,["192","204","193","287/188","203","289"],["JK961464632036","JK971618954348","JK927045136454","JK959420104173","JK963059817249","JK974145998756"],0.057341,0,["","","","","",""],["","","","","",""]]],"e":0.057341,"k":"1K-2M-6S","r":"","g":0,"u":"6cdafed1-991e-4bdb-b123-68942e7ad8b1"},{"id":126,"st":0,"v":[["bashir hussain shah","akbar ali shah",14,["324/309/258","302/68","297/130","138/1","120","22","93/1","116","67","299/17","46","254","254/1","66"],["JK706041627048","JK661292845034","JK662497362487","JK663182771807","JK648834967404","JK643699848981","JK641016773504","JK638479075905","JK255461402806","JK703044784822","JK701034278065","JK663679776810","JK664988003158","JK710537694239"],0.205403,0,["","","","","","","","","","","","","",""],["","","","","","","","","","","","","",""]]],"e":0.205403,"k":"4K-1M-2S","r":"","g":0,"u":"68bc455d-bbf6-4bf8-a453-c6a736f33ef0"},{"id":127,"st":0,"v":[["anees fatima","gulam mohi uddin shah",23,["50","51","58","84","86","88","91","92","95","93","98","46/1","118","41","94","97","297/1","40","21","19","4","92/1","95/1"],["JK211944698027","JK212795547759","JK213187013294","JK214300741666","JK214858439624","JK216739513647","JK217643207675","JK218218885267","JK220714918466","JK218758930580","JK221189003536","JK211358423793","JK221940673895","JK210608141228","JK223058147916","JK298101323528","JK299067888764","JK209337815243","JK208769120735","JK208105232084","JK207360886709","JK204884602732","JK290333496236"],0.263716,0,["","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","",""]]],"e":0.263716,"k":"5K-4M-2S","r":"","g":0,"u":"67b74db8-bbf4-4bb3-bff7-6e29082b7d9b"},{"id":128,"st":0,"v":[["shakeel fatima","matloob shah",17,["85","47","48","1","20","153/1","154/1","268/1","269","59","60/1","256","257","179","181","187","97"],["JK965077140800","JK192205691861","JK196283944053","JK956943807990","JK963105139588","JK966988970010","JK970078873299","JK971956235038","JK253688026455","JK186326865927","JK187713273515","JK189195105822","JK190795757415","JK970814912460","JK974565818464","JK978194587170","JK298089442316"],0.056821,0,["","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","",""]]],"e":0.056821,"k":"1K-2M-4S","r":"1 plot(s) with zero extent","g":0,"u":"666a8fd7-9b25-4234-a0bf-9abdbf8bff84"},{"id":129,"st":0,"v":[["taslim shah","abdulrahim shah",18,["174","209","256","90","173","172","183","182","257","180","207","87","89","96","97","59","60/1","215"],["JK987471834014","JK129917654892","JK189204814976","JK179341498078","JK666886801818","JK178455449567","JK180333878870","JK991734553894","JK190808277548","JK983884593091","JK251777619775","JK314881140940","JK249743873908","JK250984711787","JK298099252152","JK186334774366","JK187723143713","JK130959007730"],0.748034,0,["","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","",""]]],"e":0.748034,"k":"14K-15M-7S","r":"1 plot(s) with zero extent","g":0,"u":"65b5110a-b28c-4684-8001-c1be1bb422a5"},{"id":130,"st":0,"v":[["mohammad shafi","fakir ulla",3,["285/149","206","221"],["JK578653141722","JK573934443596","JK617889513357"],0.706936,0,["","",""],["","",""]]],"e":0.706936,"k":"13K-19M-5S","r":"","g":0,"u":"6544a2b8-c80a-4227-a4d2-857f37c83be2"},{"id":131,"st":0,"v":[["noor alam shah","noor shah",9,["218","153","148","11","14","15","304/152/1","216","152"],["JK298028476206","JK249465884465","JK270175724217","JK182547012263","JK184392470870","JK185994139582","JK341012014826","JK296795432993","JK283352556667"],0.830211,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.830211,"k":"16K-8M-2S","r":"","g":0,"u":"647afdf2-75c6-4073-ad90-63c332a7814e"},{"id":132,"st":0,"v":[["khushhal hussain shah","nizar ahmad shah",4,["257","60/1","59","256"],["JK190803622957","JK187717542118","JK186328616527","JK189198768256"],0.003795,0,["","","",""],["","","",""]]],"e":0.003795,"k":"0K-1M-5S","r":"1 plot(s) with zero extent","g":0,"u":"63ce4844-0993-49b6-9f2c-6fb4ab42c09e"},{"id":133,"st":2,"v":[["yakoob shah","hussain shah",2,["293/125","26"],["JK566661494680","JK517554424446"],0.046286,0,["",""],["",""]],["yakoob shah","sayed hussain shah",1,["310/194/125"],["JK579421553573"],0.037939,2,[""],[""]]],"e":0.084225,"k":"1K-13M-3S","r":"","g":0,"u":"63c3573f-356e-4031-9168-ac94fe389f84"},{"id":134,"st":0,"v":[["miskeen shah","abdulrehman shah",11,["234","137","111","233","139","9","61","62","65","235","140"],["JK738629488786","JK762923621478","JK734688509485","JK761890692755","JK764683445516","JK722716191474","JK725411717058","JK726694289996","JK727944402077","JK740330725486","JK736520989993"],0.369863,0,["","","","","","","","","","",""],["","","","","","","","","","",""]]],"e":0.369863,"k":"7K-6M-2S","r":"","g":0,"u":"6310382f-3a4a-4249-bf4c-d8faf5ed1eb5"},{"id":135,"st":0,"v":[["zameer hussain shah","abdul hamid shah",17,["208","39","205","214","182","174","97","178","183","207","257","256","59","209","60/1","215","38"],["JK981664022406","JK171983046890","JK128104195240","JK172997116280","JK991732883906","JK987483880384","JK298089684158","JK979654635789","JK180332508828","JK251770571606","JK190799981239","JK189196704636","JK186327810959","JK129918186276","JK187714661707","JK130961056072","JK171232358626"],0.825215,0,["","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","",""]]],"e":0.825215,"k":"16K-6M-2S","r":"1 plot(s) with zero extent","g":0,"u":"63016992-a8aa-479e-b173-b10378b59ff5"},{"id":136,"st":0,"v":[["masmat fatimah begum","miskeen",3,["150","176","220"],["JK598305563627","JK602784895677","JK603801908328"],0.040469,0,["","",""],["","",""]]],"e":0.040469,"k":"0K-16M-0S","r":"","g":0,"u":"62569e68-a2ec-4461-bb9d-34aec5ef3626"},{"id":137,"st":0,"v":[["masmat muzml hussain","asghar shah",1,["175"],["JK342129303991"],0.025293,0,[""],[""]]],"e":0.025293,"k":"0K-10M-0S","r":"","g":0,"u":"620b7af9-1bce-49d2-8739-7a7d56cf6a1a"},{"id":138,"st":0,"v":[["gulam nabi shah","sayed akbar shah",8,["44","271","27","7","232","115","265","53"],["JK324149522725","JK443298041901","JK343018033804","JK305499263303","JK328707791928","JK438884134871","JK341976978546","JK326929423533"],0.568184,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.568184,"k":"11K-4M-6S","r":"","g":0,"u":"6117999b-84d4-4ea8-a8fa-9f95fca1e8d1"},{"id":139,"st":0,"v":[["shakeel fatima","nizar ahmad shah",4,["257","256","59","60/1"],["JK190807144896","JK189203237126","JK186331430795","JK187722284369"],0.003795,0,["","","",""],["","","",""]]],"e":0.003795,"k":"0K-1M-5S","r":"1 plot(s) with zero extent","g":0,"u":"5e021576-ce74-4eea-b6ea-b5cc4bd775dc"},{"id":140,"st":0,"v":[["masmat ftmah","mohammad shah",3,["202","201","155"],["JK232017818730","JK214364245830","JK211699446133"],0.009005,0,["","",""],["","",""]]],"e":0.009005,"k":"0K-3M-5S","r":"","g":3,"u":"5b9634d0-b06c-48c1-ae3f-ac851d5e806f"},{"id":141,"st":0,"v":[["mardan ali shah","mohammad zaman shah",12,["111","140","65","234","235","233","62","137","61","139","9","300/43"],["JK734687342319","JK736518654459","JK727941732207","JK738627923332","JK740328551964","JK761888988519","JK726691245156","JK762921833342","JK725406756765","JK764680081010","JK722712293025","JK765948674256"],0.673296,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]]],"e":0.673296,"k":"13K-6M-2S","r":"","g":0,"u":"5aaa6c06-8499-4708-889c-120a02ee11ac"},{"id":142,"st":0,"v":[["zarin fatima","nazzeer ahmad shah",8,["167","162","170","163","161/1","166","154","163/1"],["JK390525783213","JK358920781853","JK360676302546","JK355262429246","JK361657323593","JK389457488710","JK388139414186","JK362968781091"],0.41133,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.41133,"k":"8K-2M-6S","r":"","g":0,"u":"590e8eaa-ff64-4032-a68b-04fa39d63daa"},{"id":143,"st":0,"v":[["noor fatima","rafi uddin shah",7,["163/1","161/1","154","305/152/1","163","167","166"],["JK362968007532","JK361655884129","JK388138676620","JK344030277197","JK355260281272","JK390524041235","JK389455399470"],0.140091,0,["","","","","","",""],["","","","","","",""]]],"e":0.140091,"k":"2K-15M-3S","r":"","g":0,"u":"58d7f699-cfb9-4baa-b9f5-5ef492d7f497"},{"id":144,"st":0,"v":[["munir hussain shah","tab hussain shah",1,["264"],["JK318256616112"],0.01897,0,[""],[""]]],"e":0.01897,"k":"0K-7M-5S","r":"","g":1,"u":"5879eeff-4cd9-4354-9d90-ce63885731d5"},{"id":145,"st":3,"v":[["noor shah","mohammad shah",4,["239","146","238","240"],["JK687034101843","JK688878160433","JK684529708048","JK687822556603"],0.173232,0,["","","",""],["","","",""]],["noor ahmad shah","mohd ali shah",1,["286/149"],["JK580145692474"],0.204872,3,[""],[""]]],"e":0.378104,"k":"7K-9M-4S","r":"","g":0,"u":"5851c350-8419-4b00-afbf-d226159b8d72"},{"id":146,"st":0,"v":[["shazia fatima","nazir ahmad shah",1,["97"],["JK298096547627"],0.000037,0,[""],[""]]],"e":0.000037,"k":"0K-0M-0S","r":"","g":0,"u":"577f1e9c-90cf-4500-b053-adddd9f4ba29"},{"id":147,"st":0,"v":[["habib ulla","mangta",5,["200","196","221","285/149","199"],["JK518557677668","JK518732575206","JK617882756448","JK578652728867","JK571890417318"],1.149562,0,["","","","",""],["","","","",""]]],"e":1.149562,"k":"22K-14M-5S","r":"","g":0,"u":"5723b770-4618-44a7-9328-4230749aa1ef"},{"id":148,"st":2,"v":[["muzmil hussain","gulam mohi uddin shah",8,["154","166","167","161/1","170","162","163/1","163"],["JK388136349020","JK389454942258","JK390519836524","JK361653479163","JK360673988123","JK358915865766","JK362963498111","JK355254947555"],0.229861,0,["","","","","","","",""],["","","","","","","",""]],["muzmil hussain","gh mohi ud din",2,["171","168"],["JK380809206838","JK380568280429"],0.313631,2,["",""],["",""]]],"e":0.543492,"k":"10K-14M-8S","r":"","g":0,"u":"55d01ab2-0ca8-4db7-b9de-c3415b8046b7"},{"id":149,"st":0,"v":[["farida fatima","ab hameed",1,["288/188"],["JK933012869472"],0.009491,0,[""],[""]]],"e":0.009491,"k":"0K-3M-7S","r":"","g":0,"u":"548ca149-ae18-4af0-a30f-caca7c32bd16"},{"id":150,"st":0,"v":[["saeed akbar shah","latif shah",6,["192","193","203","204","287/188","289"],["JK961469084106","JK927049059991","JK963064255016","JK971619795055","JK959423182980","JK974146967127"],0.54926,0,["","","","","",""],["","","","","",""]]],"e":0.54926,"k":"10K-17M-1S","r":"","g":0,"u":"5427820f-807c-471d-8df2-e717b1c7c8f5"},{"id":151,"st":0,"v":[["noor haider shah","noor ahmad shah",4,["15","11","14","148"],["JK185987764680","JK182541993739","JK184389773696","JK270173212092"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"540d6890-1379-4c20-b6ba-e6f0ddcfc8d7"},{"id":152,"st":0,"v":[["masmat arifa fatima","nazzeer ahmad shah",5,["15","148","153","14","11"],["JK185999512413","JK270182339107","JK249469972745","JK184395464917","JK182551406225"],0.187707,0,["","","","",""],["","","","",""]]],"e":0.187707,"k":"3K-14M-2S","r":"","g":0,"u":"53b161d9-711f-401a-ad7a-566f11ba5adb"},{"id":153,"st":1,"v":[["noor hussain shah","sharif hussain shah",3,["217","211","151"],["JK199684112620","JK287400658425","JK286160607102"],0.192857,0,["","",""],["","",""]],["noor hussan shah","sarif hussain shah",3,["201","202","155"],["JK214355156756","JK232008918078","JK211690518211"],0.101172,1,["","",""],["","",""]]],"e":0.294029,"k":"5K-16M-2S","r":"","g":0,"u":"5284aebc-7b53-4aa6-9ffa-5d5587df3dd5"},{"id":154,"st":0,"v":[["nazir hussain shah","akbar ali shah",6,["120","302/68","297/130","138/1","254","254/1"],["JK648835721091","JK661294290823","JK662498313418","JK663183623891","JK663683076244","JK664989225514"],0.112958,0,["","","","","",""],["","","","","",""]]],"e":0.112958,"k":"2K-4M-6S","r":"","g":0,"u":"4fcd73d4-41aa-456c-aee9-fd71f6c69bc0"},{"id":155,"st":1,"v":[["afazal shah","mohammad shah",4,["201","152","155","202"],["JK214355861646","JK283356936065","JK211691585461","JK232009066218"],0.04664,0,["","","",""],["","","",""]],["afzal shah","mohammad shah",3,["211","151","217"],["JK287401761528","JK286162658186","JK199684622319"],0.081587,1,["","",""],["","",""]]],"e":0.128227,"k":"2K-10M-6S","r":"","g":0,"u":"4f9f215c-e187-4933-b619-1ce5c15967aa"},{"id":156,"st":0,"v":[["zamir hussain","ab hameed",1,["288/188"],["JK933010052742"],0.013405,0,[""],[""]]],"e":0.013405,"k":"0K-5M-3S","r":"","g":0,"u":"4e27cb6c-03e0-48ab-b6dd-9caf7cf0e311"},{"id":157,"st":0,"v":[["shakeel hussain","akbar ali shah",6,["138/1","302/68","297/130","254","254/1","120"],["JK663183075351","JK661294035790","JK662498014253","JK663682654869","JK664988723569","JK648835599361"],0.112958,0,["","","","","",""],["","","","","",""]]],"e":0.112958,"k":"2K-4M-6S","r":"","g":0,"u":"4b42c067-4c97-42b4-aed3-74cf7e9c5bfa"},{"id":158,"st":0,"v":[["mehboob shah","matloob shah",5,["97","257","256","59","60/1"],["JK298083452670","JK190789018577","JK189189107351","JK186325028993","JK187708766560"],0.007624,0,["","","","",""],["","","","",""]]],"e":0.007624,"k":"0K-3M-0S","r":"1 plot(s) with zero extent","g":0,"u":"4a4bc93e-a9d2-4e0b-99af-608906d037a2"},{"id":159,"st":1,"v":[["yameen shah","sayed mohammad shah",12,["279","143","129","136","231","52","108","107","135","141","195","134"],["JK422333307136","JK666112383588","JK428624962089","JK429844326690","JK421498636712","JK421973089467","JK421613361983","JK421566105065","JK423934854066","JK425319105157","JK426033426321","JK427835354592"],0.685285,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]],["yaameen shah","sayed mohammad shah",4,["142","115","271","306/134"],["JK450281163322","JK438893315355","JK443304536299","JK453546447171"],0.349306,1,["","","",""],["","","",""]]],"e":1.034591,"k":"20K-9M-0S","r":"","g":0,"u":"49e381be-06a9-45bb-9bf9-f1ed219ecf29"},{"id":160,"st":2,"v":[["masmat khatoon fatima","masmat badul noor",8,["22","324/309/258","299/17","46","67","116","66","93/1"],["JK643707437915","JK706050895034","JK703054844202","JK701046023650","JK255516549859","JK638490500371","JK710548622686","JK641028824953"],0.488806,0,["","","","","","","",""],["","","","","","","",""]],["masmat khatoon fatima","masmat badul noor bewah syed alam shah",1,["290/177"],["JK945465905078"],0.209931,2,[""],[""]]],"e":0.698737,"k":"13K-16M-2S","r":"","g":0,"u":"49bca36e-8332-4c72-ab37-c86ccce02ec2"},{"id":161,"st":0,"v":[["shazia fatima","nizar ahmad shah",4,["59","60/1","257","256"],["JK186331112665","JK187721953743","JK190806708124","JK189202200702"],0.003795,0,["","","",""],["","","",""]]],"e":0.003795,"k":"0K-1M-5S","r":"1 plot(s) with zero extent","g":0,"u":"46a2e16d-a203-4786-b81e-0cca042e667d"},{"id":162,"st":0,"v":[["yasin shah","mohammad hasan shah",1,["308/258"],["JK708064782465"],0.136582,0,[""],[""]]],"e":0.136582,"k":"2K-14M-0S","r":"","g":0,"u":"469ec524-e9be-42e4-943b-6c457e541bbc"},{"id":163,"st":0,"v":[["safeer hussain","yousuf shah",1,["293/125"],["JK566662953553"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"460af08e-03b4-43a9-9fc0-daee976057fd"},{"id":164,"st":2,"v":[["bashir hussain shah","abdul hamid shah",17,["182","207","215","205","178","257","214","97","256","39","38","183","208","59","60/1","209","174"],["JK991729068897","JK251769273306","JK130960305147","JK128101273117","JK979649478852","JK190799090895","JK172997074333","JK298089530721","JK189196629156","JK171982401540","JK171228737256","JK180329207838","JK981659666866","JK186327341899","JK187713396188","JK129918119883","JK987480864270"],0.824565,0,["","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","",""]],["bashir hussain shah etc","abdul hamid shah",1,["210"],["JK576229628524"],0.108759,2,[""],[""]]],"e":0.933324,"k":"18K-9M-0S","r":"1 plot(s) with zero extent","g":0,"u":"4605885f-47c9-44a9-8508-fbf0fa5e231b"},{"id":165,"st":1,"v":[["shafiq hussain shah","gulam mohi uddin shah",9,["154","170","161/1","163","164","162","167","166","163/1"],["JK388135556545","JK360673439306","JK361653476986","JK355253733094","JK391737906474","JK358915640932","JK390517817542","JK389453242342","JK362962915767"],0.465085,0,["","","","","","","","",""],["","","","","","","","",""]],["shafeeq hussain shah","gulam mohi uddin shah",1,["305/152/1"],["JK344021281565"],0.005586,1,[""],[""]]],"e":0.470671,"k":"9K-6M-1S","r":"","g":0,"u":"4427f614-6e25-4251-bb0b-1cdaf3fe57a7"},{"id":166,"st":3,"v":[["noor hasan shah","akbar ali shah",9,["66","299/17","42","303","9/1","45","23","46","324/309/258"],["JK710532093480","JK703040263143","JK773475373557","JK775173073666","JK770115838957","JK772127482020","JK768941408960","JK701028762906","JK706038278604"],0.610643,0,["","","","","","","","",""],["","","","","","","","",""]],["noor hussain shah","ali akbar shah",1,["194"],["JK379291105649"],0.041733,3,[""],[""]]],"e":0.652376,"k":"12K-17M-8S","r":"","g":0,"u":"43dc0a7d-082d-4728-b4d3-fb54153ba321"},{"id":167,"st":0,"v":[["mir haider shah","noor ahmad shah",4,["11","148","15","14"],["JK182544967641","JK270174706669","JK185991568907","JK184389788369"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"43cf3099-85ac-4e7e-84ab-9b13bd542dca"},{"id":168,"st":0,"v":[["mir haider shah","matloob shah",18,["47","257","1","87","48","85","179","256","59","269","268/1","181","154/1","187","97","60/1","20","153/1"],["JK192198188892","JK190788995426","JK956937748517","JK314867565995","JK196280103567","JK965072328466","JK970802176877","JK189189103306","JK186325001665","JK253668762619","JK971952297932","JK974544308683","JK970075043943","JK978181621264","JK298081548787","JK187708286305","JK963097943515","JK966982042570"],0.125701,0,["","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","",""]]],"e":0.125701,"k":"2K-9M-6S","r":"1 plot(s) with zero extent","g":0,"u":"43661cd0-2611-4308-81df-1f9e08bcf6aa"},{"id":169,"st":0,"v":[["shafikue hussain shah","noor ahmed shah",8,["116","299/17","46","66","22","324/309/258","93/1","67"],["JK638488412854","JK703053394746","JK701045668032","JK710548301869","JK643706993621","JK706046771688","JK641027993944","JK255503878603"],0.088078,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.088078,"k":"1K-14M-7S","r":"","g":0,"u":"41dbbf4d-1798-4b6a-81a8-c59fb9808436"},{"id":170,"st":0,"v":[["saeed fatima","nizar ahmad shah",4,["257","256","59","60/1"],["JK190805217907","JK189201669896","JK186329708683","JK187721820017"],0.003795,0,["","","",""],["","","",""]]],"e":0.003795,"k":"0K-1M-5S","r":"1 plot(s) with zero extent","g":0,"u":"41b8da1a-e3db-44d8-bd36-5a739271b7d7"},{"id":171,"st":0,"v":[["muzaffar shah","hussain shah",2,["26","293/125"],["JK517547885226","JK566659729152"],0.046286,0,["",""],["",""]]],"e":0.046286,"k":"0K-18M-3S","r":"","g":0,"u":"4179e9ec-cd4b-449b-9e7f-9c4a23654e84"},{"id":172,"st":0,"v":[["munawar shah","abdul rehman",2,["147","145"],["JK703980844070","JK707009381095"],0.123935,0,["",""],["",""]]],"e":0.123935,"k":"2K-9M-0S","r":"","g":0,"u":"3fa77174-dc2d-44c9-9d6c-0b213923bf44"},{"id":173,"st":0,"v":[["abdullah shah","habib shah",19,["41","118","98","93","95","92","91","88","4","19","21","40","46/1","50","51","58","84","86","94"],["JK210606623337","JK221939582667","JK221186991809","JK218754724991","JK220713764559","JK218217853057","JK217639314072","JK216737564895","JK207359852536","JK208103517288","JK208766755648","JK209336928747","JK211355331829","JK211944203952","JK212631761145","JK213185207917","JK214299017566","JK214857263366","JK223057154850"],1.219532,0,["","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","",""]]],"e":1.219532,"k":"24K-2M-1S","r":"","g":0,"u":"3e915332-5c7c-4de5-a43a-05ea8a0fb31f"},{"id":174,"st":0,"v":[["maqin fatima","noor ahmad shah",3,["11","15","14"],["JK182546737083","JK185993536016","JK184391347297"],0.004568,0,["","",""],["","",""]]],"e":0.004568,"k":"0K-1M-7S","r":"","g":0,"u":"3e2cda01-80aa-442f-8fb2-7399fe4e4c70"},{"id":175,"st":2,"v":[["noor ahmad shah","hussain shah",2,["26","293/125"],["JK517549630524","JK566660723246"],0.046286,0,["",""],["",""]],["noor ahmad shah","sayed hussain shah",1,["310/194/125"],["JK579421316281"],0.037939,2,[""],[""]]],"e":0.084225,"k":"1K-13M-3S","r":"","g":0,"u":"3dc3b5a9-4121-4ac1-a73d-4dea9f55b129"},{"id":176,"st":0,"v":[["shakeel fatima","nazir ahmad shah",1,["97"],["JK298098388634"],0.000037,0,[""],[""]]],"e":0.000037,"k":"0K-0M-0S","r":"","g":0,"u":"3b53b183-bb23-4cec-925c-1e64c9711cc1"},{"id":177,"st":2,"v":[["raqub fatima","mehroom mehrban shah",4,["59","257","60/1","256"],["JK186328375635","JK190802531294","JK187716500007","JK189198139689"],0.003795,0,["","","",""],["","","",""]],["raqub fatima","mehrban shah",1,["97"],["JK298091754815"],0.000632,2,[""],[""]]],"e":0.004427,"k":"0K-1M-7S","r":"1 plot(s) with zero extent","g":0,"u":"3a8bbd35-9a58-4dd9-8574-9c0867bfb972"},{"id":178,"st":0,"v":[["yasin shah","abdul rahim shah",3,["215","97","209"],["JK130958520251","JK298077604738","JK129916906663"],0.17201,0,["","",""],["","",""]]],"e":0.17201,"k":"3K-8M-0S","r":"","g":0,"u":"39b097ac-c604-4787-9d43-49c81b8b96c1"},{"id":179,"st":0,"v":[["masmat zarin fatima","hussain shah",1,["99"],["JK518136968731"],0.02503,0,[""],[""]]],"e":0.02503,"k":"0K-9M-8S","r":"","g":0,"u":"38679aca-1c13-4f32-91af-e8b122cc9ed5"},{"id":180,"st":0,"v":[["khaleek hussain shah","akbar ali shah",6,["120","254/1","138/1","302/68","297/130","254"],["JK648834884050","JK664986789003","JK663182668431","JK661290942205","JK662495113134","JK663679330263"],0.111693,0,["","","","","",""],["","","","","",""]]],"e":0.111693,"k":"2K-4M-1S","r":"","g":0,"u":"3806cb8e-00e9-41c5-ba14-4804a2205aca"},{"id":181,"st":0,"v":[["nazir fatima","mohammad shah",9,["9/1","45","23","46","324/309/258","299/17","66","42","303"],["JK770116838023","JK772133829462","JK768942807468","JK701031659895","JK706040463900","JK703044018563","JK710532934676","JK773477516138","JK775174659557"],0.610643,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.610643,"k":"12K-1M-4S","r":"","g":0,"u":"3370da68-0251-4397-a216-96c43e0e084b"},{"id":182,"st":0,"v":[["noor fatima","noor ahmed shah",8,["324/309/258","116","93/1","22","67","46","299/17","66"],["JK706047669580","JK638489767284","JK641028359641","JK643707183944","JK255513771153","JK701045846272","JK703054448600","JK710548444946"],0.088078,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.088078,"k":"1K-14M-7S","r":"","g":0,"u":"308353ce-2a89-4310-9596-9a2466e7e7d3"},{"id":183,"st":0,"v":[["farook shah","matloob shah",16,["60/1","256","257","47","179","187","48","1","20","85","153/1","154/1","268/1","269","59","181"],["JK187710668003","JK189189548508","JK190794030992","JK192200518787","JK970806773377","JK978190106406","JK196282955474","JK956941441544","JK963101173952","JK965074303820","JK966987574598","JK970077541722","JK971954337051","JK253677269264","JK186325136333","JK974554964240"],0.120606,0,["","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","",""]]],"e":0.120606,"k":"2K-7M-6S","r":"1 plot(s) with zero extent","g":0,"u":"30409e23-ee42-49b1-8a6d-27e7ffa2c1bf"},{"id":184,"st":1,"v":[["yaameen shah","abdulrahim shah",12,["256","60/1","207","97","59","180","257","96","174","89","87","182"],["JK189204092378","JK187722944297","JK251776113643","JK298098520334","JK186332324643","JK983872424133","JK190807610432","JK250980583965","JK987468449749","JK249740909324","JK314873707699","JK991734354973"],0.470446,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]],["yameen shah","abdulrahim shah",4,["183","172","173","90"],["JK180332846173","JK178452716597","JK666884443541","JK179341162145"],0.105597,1,["","","",""],["","","",""]]],"e":0.576043,"k":"11K-7M-7S","r":"1 plot(s) with zero extent","g":0,"u":"2f78ec1f-2d00-46d7-a274-83d47a6ca1a0"},{"id":185,"st":2,"v":[["aziz ur rahman","abdul hamid shah",12,["181","47","179","153/1","269","187","1","20","85","48","268/1","154/1"],["JK974526762036","JK192196217257","JK970795805467","JK966980185572","JK253658652059","JK978176294791","JK956935836530","JK963096876219","JK965070365869","JK196279414922","JK971948234433","JK970072524316"],0.536451,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]],["aziz ur rehman","abdul hamid",4,["257","60/1","256","59"],["JK190786883669","JK187705578253","JK189187312813","JK186323161689"],0.032561,2,["","","",""],["","","",""]],["aziz rahman","abdul hamid",1,["97"],["JK298079466283"],0.000372,2,[""],[""]]],"e":0.569384,"k":"11K-5M-1S","r":"","g":0,"u":"2e5674a1-3ef5-41a9-9448-0f89569c3812"},{"id":186,"st":0,"v":[["sayed hussain","nazzeer hussain shah",2,["218","216"],["JK298029355366","JK296797246899"],0.068939,0,["",""],["",""]]],"e":0.068939,"k":"1K-7M-2S","r":"","g":0,"u":"2cf95012-fc16-4536-804f-4e4382c78a4a"},{"id":187,"st":3,"v":[["noor hasan","sayed ilm shah",2,["147","145"],["JK703987222827","JK707010836105"],0.123935,0,["",""],["",""]],["noor hussain shah","sayed ilm shah",2,["147","145"],["JK703984862917","JK707010258814"],0.121406,3,["",""],["",""]],["shah hussain shah","sayed ilm shah",2,["147","145"],["JK703987963436","JK707013060974"],0.121405,3,["",""],["",""]]],"e":0.366746,"k":"7K-5M-0S","r":"","g":0,"u":"2cc731ce-b1d0-4b0a-a19b-4d25197275ba"},{"id":188,"st":0,"v":[["noor haider shah","sayed alam shah",9,["299/17","18","46","66","93/1","67","116","22","324/309/258"],["JK703050349618","JK669419242350","JK701042509567","JK710544681043","JK641023328887","JK255479462731","JK638485457739","JK643702650453","JK706043438375"],0.241509,0,["","","","","","","","",""],["","","","","","","","",""]]],"e":0.241509,"k":"4K-15M-4S","r":"","g":0,"u":"2b012f2d-0e42-42d6-890a-a159a8c3fa81"},{"id":189,"st":0,"v":[["mohammad yousuf","miskeen",4,["221","150","176","220"],["JK617883147499","JK598299435132","JK602779706360","JK603796982584"],0.180845,0,["","","",""],["","","",""]]],"e":0.180845,"k":"3K-11M-5S","r":"","g":0,"u":"29d8fcd1-e608-4744-9b70-7c4200f348b3"},{"id":190,"st":0,"v":[["karim shah","sher shah",6,["203","289","204","192","287/188","193"],["JK963061188666","JK974146419799","JK971619550304","JK961468927155","JK959421786659","JK927047231046"],0.54917,0,["","","","","",""],["","","","","",""]]],"e":0.54917,"k":"10K-17M-1S","r":"","g":0,"u":"2980d9ff-5a64-4965-9b4e-b3d3a2caa6a0"},{"id":191,"st":0,"v":[["afazal shah","fazal shah",2,["165","161"],["JK377206128176","JK341754922201"],0.185902,0,["",""],["",""]]],"e":0.185902,"k":"3K-13M-4S","r":"","g":0,"u":"289c461c-ef58-45df-940c-9ad1a2aa271a"},{"id":192,"st":1,"v":[["yakoob shah","sarwar shah",5,["70","77","80","75","69"],["JK262049157387","JK262744365060","JK263075751901","JK582499513108","JK259847428084"],0.169527,0,["","","","",""],["","","","",""]],["yaqoob shah","sarwar shah",2,["76","79"],["JK598904887336","JK594303935119"],0.062448,1,["",""],["",""]]],"e":0.231975,"k":"4K-11M-6S","r":"","g":0,"u":"23fbed3e-0a40-4d88-90af-dc13d3ead492"},{"id":193,"st":2,"v":[["faiz ali shah","feroz shah",18,["103/1","138","100","113","123","114","119","128","267","122","102","121","292/10","101","103","130","112","255"],["JK460421282886","JK455950708635","JK472708139548","JK471947940303","JK471089712479","JK463551955132","JK465052608803","JK466990452935","JK469316387658","JK452453240508","JK451192606863","JK449365234198","JK448503047189","JK447857442429","JK446738914542","JK468057663760","JK462324949020","JK458586129715"],1.23935,0,["","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","",""]],["faiz ali shah","feroze ali shah",6,["311/294","250","125/1","126","117","127"],["JK507483937640","JK513370249608","JK511681111523","JK501343560006","JK491716708850","JK497518090338"],0.096745,2,["","","","","",""],["","","","","",""]],["faiz ali shah","feroz ali shah",1,["268"],["JK443286909371"],0.151757,2,[""],[""]]],"e":1.487852,"k":"29K-8M-2S","r":"","g":0,"u":"2350fc41-ecd3-4b57-a389-1ebfa3d85d73"},{"id":194,"st":0,"v":[["yousuf shah","matloob shah",18,["181","1","20","85","153/1","154/1","268/1","269","59","60/1","256","257","47","179","87","187","97","48"],["JK974554069004","JK956940281191","JK963100424571","JK965073886521","JK966983814232","JK970076278121","JK971953866451","JK253675070205","JK186325074487","JK187710657349","JK189189417591","JK190790822131","JK192199717405","JK970804702762","JK314871592603","JK978187357128","JK298083983614","JK196281392601"],0.128231,0,["","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","",""]]],"e":0.128231,"k":"2K-10M-6S","r":"1 plot(s) with zero extent","g":0,"u":"22ea59f7-68bb-471d-ac40-c3b864e8f2ce"},{"id":195,"st":0,"v":[["khushhal hussain shah","nazir ahmad shah",1,["97"],["JK298093344768"],0.000037,0,[""],[""]]],"e":0.000037,"k":"0K-0M-0S","r":"","g":0,"u":"22be3085-5a92-4084-b830-a159a00897a9"},{"id":196,"st":0,"v":[["shamsh fatima","yousuf shah",1,["293/125"],["JK566664965613"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"216608ef-3e55-4e9a-80af-b4aca1152108"},{"id":197,"st":0,"v":[["gazi shah","yousuf shah",1,["293/125"],["JK566669685656"],0.006241,0,[""],[""]]],"e":0.006241,"k":"0K-2M-4S","r":"","g":0,"u":"2040b124-51b9-4115-ba70-669c93fbe954"},{"id":198,"st":0,"v":[["gulam haider shah","mir alam shah",1,["299/43"],["JK945915811570"],0.237753,0,[""],[""]]],"e":0.237753,"k":"4K-14M-0S","r":"","g":0,"u":"1fe90a6e-d35f-4623-8544-b4620555d8d9"},{"id":199,"st":0,"v":[["farooq hussain shah","rakeeb shah",6,["193","192","287/188","289","203","204"],["JK927041144968","JK961462785760","JK959417318429","JK974143188694","JK963056988846","JK971612796004"],0.056365,0,["","","","","",""],["","","","","",""]]],"e":0.056365,"k":"1K-2M-3S","r":"","g":0,"u":"1f319838-67a8-4043-becb-0a5cd97e9dd2"},{"id":200,"st":2,"v":[["sayed hussain","nazzeer ahmad shah",3,["15","14","11"],["JK185999192856","JK184393038198","JK182549937506"],0.003916,0,["","",""],["","",""]],["sayed hussain shah","nazzeer ahmad shah",2,["153","148"],["JK249467853616","JK270181415248"],0.187155,2,["",""],["",""]]],"e":0.191071,"k":"3K-15M-5S","r":"","g":0,"u":"1eccdcef-6e46-4139-abf7-f4b287e59eac"},{"id":201,"st":0,"v":[["masmat fatima","rakeeb shah",6,["193","204","203","192","287/188","289"],["JK927041846692","JK971615868111","JK963057357461","JK961462788316","JK959417655916","JK974143593973"],0.001981,0,["","","","","",""],["","","","","",""]]],"e":0.001981,"k":"0K-0M-7S","r":"","g":0,"u":"1e263152-c426-4b9e-b5cd-e2fb1ebacf94"},{"id":202,"st":0,"v":[["saeed ahmad shah","noor ahmad shah",4,["148","11","15","14"],["JK270173120320","JK182541698429","JK185986209647","JK184389095689"],0.036359,0,["","","",""],["","","",""]]],"e":0.036359,"k":"0K-14M-3S","r":"","g":0,"u":"1da47b41-3f93-448c-a226-7b672799dd71"},{"id":203,"st":3,"v":[["hasan shah","abdulrehman shah",11,["9","61","62","65","111","140","234","235","233","137","139"],["JK722718107377","JK725411927145","JK726694928118","JK727945331378","JK734690331543","JK736521146829","JK738630044390","JK740331122685","JK761893300238","JK762923979934","JK764683773343"],0.372422,0,["","","","","","","","","","",""],["","","","","","","","","","",""]],["talib hussain shah","abdulrehman shah",7,["69","80","124","75","70","291/10","77"],["JK259852852440","JK263079120797","JK583147286773","JK582503448654","JK262062339024","JK583401134397","JK262756383056"],1.011464,3,["","","","","","",""],["","","","","","",""]],["talib hussain shah","ab rehman shah",4,["83","78","81","76"],["JK594981137481","JK597057667479","JK597679666822","JK598911425366"],0.271746,3,["","","",""],["","","",""]]],"e":1.655632,"k":"32K-14M-5S","r":"","g":0,"u":"1d693d69-097c-4c69-bd8a-83bfcd529267"},{"id":204,"st":0,"v":[["muzammel hussain","ali akbar shah",14,["31","281","247","34","242","252","251","56 min","253","32","30","33","243","29"],["JK501672456223","JK511334981612","JK509893383790","JK508111374586","JK509127780276","JK513845429982","JK515165451262","JK509414065688","JK515603157039","JK512488007333","JK514267032118","JK512960874336","JK500037532379","JK500874343809"],0.708199,0,["","","","","","","","","","","","","",""],["","","","","","","","","","","","","",""]]],"e":0.708199,"k":"14K-0M-0S","r":"","g":0,"u":"1a8d0c26-2bb8-4876-bdfb-42df8bc84e17"},{"id":205,"st":0,"v":[["nozrin fatima","raqub shah",20,["135","271","134","143","54","129","136","115","8","230","283","280","37","36","195","141","106/1","106","105","35"],["JK423934336436","JK443303923949","JK427834762441","JK666110049595","JK414421854654","JK428624940032","JK429844083866","JK438892303621","JK419113739191","JK418593232996","JK416920319380","JK415369991095","JK413104270275","JK412284135987","JK426032640590","JK425318783804","JK421256905823","JK420726152046","JK420312121486","JK419794392161"],0.31363,0,["","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","",""]]],"e":0.31363,"k":"6K-4M-0S","r":"","g":0,"u":"1a11fafc-9448-4cad-8d2f-d8950430e270"},{"id":206,"st":0,"v":[["noor haider shah","fakir shah",6,["192","287/188","193","203","289","204"],["JK961463856250","JK959418497022","JK927044471178","JK963058144029","JK974144819576","JK971617262064"],0.16696,0,["","","","","",""],["","","","","",""]]],"e":0.16696,"k":"3K-6M-0S","r":"","g":0,"u":"19842f32-f023-4e87-b0b0-d30bf93dc5ac"},{"id":207,"st":0,"v":[["masmat yaameen fatima","gulam mohi uddin shah",1,["305/152/1"],["JK344024944136"],0.005586,0,[""],[""]]],"e":0.005586,"k":"0K-2M-2S","r":"","g":0,"u":"1951163e-3f7d-48f6-b95f-aa6bd39382b6"},{"id":208,"st":0,"v":[["yaameen shah","raqub shah",20,["280","54","37","271","115","136","129","143","134","195","141","135","106/1","106","35","8","230","283","36","105"],["JK415366869852","JK414421365317","JK413103679779","JK443302310508","JK438888269301","JK429841472558","JK428624141729","JK666108449605","JK427833877543","JK426031926371","JK425317159507","JK423933108255","JK421255082840","JK420724342954","JK419792854862","JK419113484437","JK418592100419","JK416918536305","JK412282758655","JK420311360596"],0.948779,0,["","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","",""]]],"e":0.948779,"k":"18K-15M-1S","r":"","g":0,"u":"18fa60aa-4e87-4a15-9452-8f29849a2159"},{"id":209,"st":0,"v":[["arif hussain","nazir ahmad shah",1,["97"],["JK298095633590"],0.000037,0,[""],[""]]],"e":0.000037,"k":"0K-0M-0S","r":"","g":0,"u":"16a390dd-7683-43de-922f-f9d1a342806f"},{"id":210,"st":2,"v":[["maksood ali shah","sayed hussain shah",6,["271","115","44","53","232","261"],["JK443294593381","JK438878201672","JK324146726212","JK326928195765","JK328705271945","JK344502559539"],0.067903,0,["","","","","",""],["","","","","",""]],["maksood ali shah","sayed hassan shah",3,["262","3","244"],["JK395150658482","JK302225923412","JK392941439534"],0.128574,3,["","",""],["","",""]],["maqsood ali shah","syed hasan shah",2,["244","262"],["JK392944499187","JK395151709452"],0.07335,3,["",""],["",""]],["maksood shah","sayed hussain shah",2,["273","274"],["JK339169450622","JK340141031932"],0.053115,2,["",""],["",""]],["maksood","syed hussain shah",1,["26/1"],["JK398925823025"],0.025293,2,[""],[""]]],"e":0.348235,"k":"6K-17M-6S","r":"","g":0,"u":"14a25150-e549-4428-a41f-1c4d5231ab35"},{"id":211,"st":0,"v":[["nizar hussain shah","ali akbar shah",1,["194"],["JK379292393866"],0.041733,0,[""],[""]]],"e":0.041733,"k":"0K-16M-4S","r":"","g":0,"u":"12af7a46-e8a0-467f-a5bb-e4f9acbaf880"},{"id":212,"st":0,"v":[["sikandar shah","abdul rehman",2,["147","145"],["JK703979157033","JK707009323185"],0.123935,0,["",""],["",""]]],"e":0.123935,"k":"2K-9M-0S","r":"","g":0,"u":"12661f59-3d38-4086-bfd5-62eab1061d86"},{"id":213,"st":1,"v":[["masmat shafiq fatima","matloob shah",16,["153/1","268/1","269","256","1","20","85","154/1","48","59","60/1","257","47","179","181","187"],["JK966988388465","JK971956214429","JK253681138082","JK189192055400","JK956942907398","JK963104132925","JK965075648427","JK970078787520","JK196283658724","JK186326249476","JK187712567482","JK190795461013","JK192205339692","JK970812243659","JK974561443630","JK978193216623"],0.061736,0,["","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","",""]],["masmat shafikue fatima","matloob shah",1,["97"],["JK298086172624"],0.000019,1,[""],[""]]],"e":0.061755,"k":"1K-4M-4S","r":"1 plot(s) with zero extent","g":0,"u":"10de4dc8-0191-4b36-8895-945ed03f9642"},{"id":214,"st":0,"v":[["fakar shah","azeem shah",6,["287/188","289","204","203","193","192"],["JK959417746564","JK974143803096","JK971616161468","JK963057932980","JK927044433052","JK961463032170"],0.16696,0,["","","","","",""],["","","","","",""]]],"e":0.16696,"k":"3K-6M-0S","r":"","g":0,"u":"1049789c-c122-438a-843f-883c06af0311"},{"id":215,"st":0,"v":[["noor haider","hussain shah",26,["130","103","101","292/10","112","114","119","128","267","123","113","100","117","121","102","122","138","255","103/1","5","127","126","125/1","250","311/294","99"],["JK468056875364","JK446736779643","JK447851666279","JK448501129462","JK462323928493","JK463551136200","JK465051664758","JK466990125078","JK469314873120","JK471088911229","JK471943509098","JK472701659997","JK491717115748","JK449364375088","JK451190273201","JK452452975941","JK455948222181","JK458585081375","JK460419154326","JK394751694781","JK497518142779","JK501343904106","JK511681559657","JK513370435338","JK507483948370","JK518134400044"],0.956707,0,["","","","","","","","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","","","","","","","",""]]],"e":0.956707,"k":"18K-18M-2S","r":"","g":0,"u":"0fec88db-6028-472c-81fb-958b662622d7"},{"id":216,"st":0,"v":[["gulam ihhya","miskeen",1,["221"],["JK617884772804"],0.073349,0,[""],[""]]],"e":0.073349,"k":"1K-9M-0S","r":"","g":0,"u":"0f9de669-7abd-4531-8b71-77dfa49b03df"},{"id":217,"st":0,"v":[["yaqoob shah","matloob shah",12,["48","187","181","153/1","268/1","154/1","1","20","179","47","269","85"],["JK196280217478","JK978182535657","JK974549441302","JK966983675292","JK971952369513","JK970075971136","JK956939856714","JK963100173430","JK970803524775","JK192198472141","JK253672941879","JK965072878797"],0.112331,0,["","","","","","","","","","","",""],["","","","","","","","","","","",""]]],"e":0.112331,"k":"2K-4M-4S","r":"","g":0,"u":"0f5db62b-e5e1-4512-8618-a4c28ca06046"},{"id":218,"st":0,"v":[["shakoor hussain","nazzeer ahmad shah",5,["14","153","15","148","11"],["JK184394966890","JK249468957677","JK185999405173","JK270181584584","JK182550827669"],0.188572,0,["","","","",""],["","","","",""]]],"e":0.188572,"k":"3K-14M-5S","r":"","g":0,"u":"0e296fa8-ef80-4fda-a3e5-dab560aa0671"},{"id":219,"st":0,"v":[["miskeen shah","nasar ali shah",5,["45","23","9/1","303","42"],["JK772131349455","JK768941497988","JK770116621330","JK775174314890","JK773476316648"],0.289603,0,["","","","",""],["","","","",""]]],"e":0.289603,"k":"5K-14M-4S","r":"","g":0,"u":"0cb551ec-f540-4bb9-a327-77275c97cce3"},{"id":220,"st":0,"v":[["Naseeb fatima","akbar ali shah",5,["138/1","254/1","302/68","297/130","254"],["JK663185975088","JK664989720640","JK661295071783","JK662501490464","JK663684488332"],0.074274,0,["","","","",""],["","","","",""]]],"e":0.074274,"k":"1K-9M-3S","r":"","g":0,"u":"0c4a646d-8c58-4ff1-958e-8b40c6d0ee91"},{"id":221,"st":0,"v":[["miskeen shah","raqub shah",20,["283","230","8","271","35","105","106","106/1","135","141","195","134","143","129","136","115","36","37","54","280"],["JK416919016987","JK418592297989","JK419113553865","JK443303380053","JK419793458936","JK420311885697","JK420725910448","JK421256653935","JK423933164807","JK425317572334","JK426032414158","JK427834696945","JK666109421795","JK428624412669","JK429843212278","JK438890218089","JK412282859252","JK413104033205","JK414421738015","JK415367934200"],0.324517,0,["","","","","","","","","","","","","","","","","","","",""],["","","","","","","","","","","","","","","","","","","",""]]],"e":0.324517,"k":"6K-8M-3S","r":"","g":0,"u":"0c220beb-8e50-48ea-913e-0375e561ec61"},{"id":222,"st":0,"v":[["hafeez fatima","yousuf shah",1,["293/125"],["JK566667029820"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"08f431c1-8e8a-42d0-b6d3-661641a8ec18"},{"id":223,"st":0,"v":[["mehboob shah","sarwar shah",7,["69","76","79","80","77","70","75"],["JK259845483360","JK598903243921","JK594302040164","JK263075559051","JK262739313603","JK262046364738","JK582499285538"],0.231975,0,["","","","","","",""],["","","","","","",""]]],"e":0.231975,"k":"4K-11M-6S","r":"","g":0,"u":"0862dbb2-5a43-4a22-b3be-39362d1339d0"},{"id":224,"st":0,"v":[["fareed fatima","mohammad shah",3,["211","151","217"],["JK287404188560","JK286166145640","JK199689852664"],0.068299,0,["","",""],["","",""]]],"e":0.068299,"k":"1K-7M-0S","r":"","g":3,"u":"07f3d71c-f296-4617-bbb4-968b97f7d0ed"},{"id":225,"st":0,"v":[["qasim shah","hasan ali shah",6,["125/1","250","311/294","117","127","126"],["JK511680852447","JK513366791521","JK507480695957","JK491715950747","JK497515581815","JK501343349833"],0.096745,0,["","","","","",""],["","","","","",""]]],"e":0.096745,"k":"1K-18M-2S","r":"","g":0,"u":"0558bbf3-7efd-4e29-971f-4b35af17528b"},{"id":226,"st":2,"v":[["nasib fatima","talib hussain shah",8,["263","53","232","115","271","298/131","132","44"],["JK304349006822","JK326931511185","JK328710505562","JK438885877487","JK443301163339","JK447729248088","JK407077630005","JK324152717089"],0.07302,0,["","","","","","","",""],["","","","","","","",""]],["nasim fatima","hussain shah",1,["99"],["JK518134744378"],0.02503,2,[""],[""]]],"e":0.09805,"k":"1K-18M-7S","r":"","g":0,"u":"04d99334-8eec-426a-b5d1-ec2e34a2a91b"},{"id":227,"st":0,"v":[["inayat ulla shah","sayed zaman shah",6,["76","78","237","81","82","236"],["JK598914581021","JK597060003440","JK587267533236","JK597681616807","JK595817725578","JK587611127407"],0.267794,0,["","","","","",""],["","","","","",""]]],"e":0.267794,"k":"5K-5M-8S","r":"","g":0,"u":"0320bd06-39fa-4c2c-8104-4224f84c9753"},{"id":228,"st":0,"v":[["shamim ahmad shah","akbar ali shah",8,["93/1","46","66","22","299/17","324/309/258","67","116"],["JK641018848800","JK701038787807","JK710541034755","JK643701749560","JK703047835122","JK706042568872","JK255477395674","JK638482320783"],0.092445,0,["","","","","","","",""],["","","","","","","",""]]],"e":0.092445,"k":"1K-16M-5S","r":"","g":0,"u":"02a4536a-db65-4443-955a-a0883fec4371"},{"id":229,"st":0,"v":[["masmat taslim fatima","yousuf shah",1,["293/125"],["JK566664821353"],0.006192,0,[""],[""]]],"e":0.006192,"k":"0K-2M-4S","r":"","g":0,"u":"014db210-1bec-4799-835f-dc7e95673b84"}],"groups":[{"id":1,"c":"Medium","b":[22,144],"ev":[[22,144,"Medium","Spelling",[]]],"cs":[]},{"id":2,"c":"Medium","b":[28,72],"ev":[[28,72,"Medium","Spelling",[]]],"cs":[]},{"id":3,"c":"Medium","b":[41,57,140,224],"ev":[[41,140,"Medium","Spelling",[]],[41,224,"Medium","Short form",["151","211","217"]],[57,140,"Medium","Short form",["155","201","202"]],[57,224,"Medium","Spelling",[]]],"cs":[]},{"id":4,"c":"Medium","b":[62,97],"ev":[[62,97,"Medium","Spelling",[]]],"cs":[]}],"plots":1505,"ext":69.00908,"kms":"1364K-4M-0S","extra":[],"mismatch":[],"khewats":0,"khatas":0,"agriPlots":1505,"noAgri":true};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const BY=new Map(DATA.buckets.map(b=>[b.id,b]));
+const UIDS=new Map(DATA.buckets.map(b=>[String(b.u??b.id),b.id]));      // real bucket ID (as saved in the sheet) → number on this page
+const idOf=v=>UIDS.get(String(v).trim());
+const GR=new Map(DATA.groups.map(g=>[g.id,g]));
+const STATUS={gen:'Generated',not:'Not generated'};
+const plotsOf=b=>b.v.reduce((a,v)=>a+v[2],0);
+const kmsP=k=>k.replace(/K-/,' K ').replace(/M-/,' M ').replace(/S$/,' S');
+const STORE='farmerIdByBucket:'+VILLAGE+(DATA.buckets[0]&&DATA.buckets[0].u?':'+DATA.buckets.length+':'+DATA.buckets[0].u:'');
+const dropRemark=r=>(r||'').split('; ').filter(x=>x&&!/survey no/i.test(x)).join('; ');
+
+/* E: 'B<id>' -> bucket entry {s,fid,reason,note,n,shared,by,at,synced}; 'G<id>' -> {mode:'one'|'sep'} */
+let E={};
+try{E=JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){}
+const persist=()=>{try{localStorage.setItem(STORE,JSON.stringify(E))}catch(e){}};
+const ent=id=>E['B'+id]||{};
+const gmode=gid=>E['G'+gid]?.mode||'sep';
+
+$('#vname').textContent=VILLAGE?' – '+VILLAGE:'';
+document.title='Farmer ID status by bucket'+$('#vname').textContent;
+$('#totals').textContent=`${DATA.buckets.length} buckets, ${DATA.plots.toLocaleString()} plots, ${DATA.ext.toFixed(2)} ha (${kmsP(DATA.kms)})`;
+
+/* ---------- counting: buckets vs Farmer IDs ---------- */
+function counts(){
+  let gen=0,not=0; const units=new Map();
+  for(const b of DATA.buckets){
+    const e=ent(b.id);
+    if(e.s==='not') not++;
+    if(e.s!=='gen') continue;
+    gen++;
+    const fid=(e.fid||'').trim().toUpperCase();
+    const key=fid?'F'+fid:(e.shared?'G'+e.shared:'B'+b.id);
+    const u=units.get(key)||{b:0,n:0}; u.b++; u.n=Math.max(u.n,e.shared?1:(+e.n||1)); units.set(key,u);
+  }
+  let ids=0,sharedB=0,sharedU=0,splitB=0,splitIds=0;
+  for(const u of units.values()){ ids+=u.n; if(u.b>1){sharedB+=u.b;sharedU++;} else if(u.n>1){splitB++;splitIds+=u.n;} }
+  return {T:DATA.buckets.length,gen,not,open:DATA.buckets.length-gen-not,ids,sharedB,sharedU,splitB,splitIds};
+}
+function renderChips(){$('#chips').innerHTML=FILTERS.map(([k,l,fn])=>`<button class="chip" data-f="${k}" aria-pressed="${filter===k}">${l}<em>${DATA.buckets.filter(fn).length}</em></button>`).join('');}
+function stats(){
+  renderChips();
+  const c=counts(), pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
+  const notClaimed=c.T-c.gen;                       // simple rule: total − claimed
+  const diff=c.gen-c.ids;                           // buckets absorbed because one ID covers several buckets
+  $('#stats').innerHTML=`<div class="stat"><b>${c.T}</b><span>total buckets</span></div>
+    <div class="stat g"><b>${c.gen}</b><span>buckets claimed</span></div>
+    <div class="stat n"><b>${notClaimed}</b><span>buckets not claimed</span><small>total − claimed</small></div>
+    <div class="stat id"><b>${c.ids}</b><span>Farmer IDs generated</span><small>${c.gen?(diff>0?`${pl(c.gen,'bucket')} claimed by ${pl(c.ids,'ID')}: difference ${diff}, as ${pl(c.sharedB,'bucket')} share ${pl(c.sharedU,'ID')}`:`one ID per claimed bucket`):'&nbsp;'}</small></div>`;
+  if(CLAIM){ const u=DATA.buckets.filter(b=>CLAIM.un.has(b.id)).length, p=DATA.buckets.filter(b=>CLAIM.part.has(b.id)).length;
+    $('#stats').insertAdjacentHTML('beforeend',`<div class="stat ag"><b>${c.T-u}</b><span>buckets claimed in AgriStack</span><small>${c.T-u-p} fully${p?` + ${p} partly`:''} · ${u} unclaimed · report of ${esc(CLAIM.date)}</small>
+      <button class="agbtn ${filter==='agc'?'on':''}" id="agbtn" type="button">${filter==='agc'?'Show all buckets':`Show claimed &amp; partly claimed (${c.T-u})`}</button></div>`); }
+  $('#bigbar').innerHTML=`<i style="width:${c.gen*100/c.T}%;background:var(--field)"></i>`;
+}
+/* ---------- read-only guidance ---------- */
+function guidance(b,inGroup){
+  const out=[];
+  if(b.g&&!inGroup){const g=GR.get(b.g);out.push(`<div class="guide link">Check if same person as bucket ${g.b.filter(x=>x!==b.id).join(', ')}?</div>`);}
+  if(b.st===3) out.push(`<div class="guide warn">This bucket may hold more than one person. Plots are recorded as:<ul>${b.v.map(v=>`<li>${esc(v[0])} / ${esc(v[1])} (${v[2]} plot${v[2]>1?'s':''})</li>`).join('')}</ul>Check before marking the whole bucket.</div>`);
+  else if(b.st>0) out.push(`<div class="guide soft">Also written as ${b.v.slice(1).map(v=>esc(v[0])+' / '+esc(v[1])).join('; ')}. Same person, written differently.</div>`);
+  const r=dropRemark(b.r); if(r) out.push(`<div class="guide soft">${esc(r)}</div>`);
+  return out.join('');
+}
+function stampText(e){return e.s?`${esc(e.by||'')}${e.at?', '+new Date(e.at).toLocaleString([],{dateStyle:'medium',timeStyle:'short'}):''}${!e.synced&&APPS_SCRIPT_URL?' – not yet saved':''}`:''}
+function linkedIdHint(b){
+  if(!b.g) return '';
+  const mine=(ent(b.id).fid||'').trim();
+  const ids=GR.get(b.g).b.filter(x=>x!==b.id).map(x=>[x,(ent(x).fid||'').trim()]).filter(([,f])=>f);
+  if(!ids.length) return '';
+  const f=ids[0][1];
+  if(mine&&mine!==f) return `<div class="use" style="color:var(--brick)">Bucket ${ids[0][0]} has a different ID: ${esc(f)}</div>`;
+  if(mine===f) return '';
+  return `<div class="use">Bucket ${ids[0][0]} has ID ${esc(f)}<button data-use="${esc(f)}">Use same ID</button></div>`;
+}
+
+/* entry panel: target is 'B<id>' (one bucket) or 'G<id>' (one ID for a whole group) */
+/* REASON_BEFORE_SAVE: pressing "Not generated" records nothing by itself. The entry is made, counted and
+   saved only when a reason is chosen. Until then the box is a draft kept on this screen only. */
+const DRAFT=new Set();
+function entryPanel(target,e,opts={}){
+  const draft=DRAFT.has(target), s=draft?'not':(e.s||'');
+  if(draft) e={...e,reason:'',note:'',_was:e.s};
+  const need=s==='not'&&!e.reason;
+  return `<div class="entry ${s?'s-'+s:''} ${draft?'draft':''}" data-t="${target}">
+    <div class="elabel">Farmer ID status <span>${draft?'not recorded yet':s?'recorded':'enter here'}</span></div>
+    <div class="seg" role="group" aria-label="Farmer ID status">
+      <button class="sbtn gen ${s==='gen'?'on':''}" data-s="gen" aria-pressed="${s==='gen'}">Generated</button>
+      <button class="sbtn not ${s==='not'?'on':''}" data-s="not" aria-pressed="${s==='not'}">Not generated</button>
+      <button class="rbtn" data-reset="1" ${s||e.fid||e.note||e.reason?'':'disabled'} title="Remove this entry">Reset</button>
+    </div>
+    ${s==='not'?`<select data-f="reason" required class="${need?'need':''}"><option value="">Select reason…</option>${REASONS.map(r=>`<option ${e.reason===r?'selected':''}>${esc(r)}</option>`).join('')}${e.reason&&!REASONS.includes(e.reason)?`<option value="${esc(e.reason)}" selected>${esc(e.reason)} (no longer on the list)</option>`:''}</select>`:''}
+    ${s==='not'?`<input data-f="note" ${e.reason?'':'disabled'} placeholder="${e.reason?'Remarks (optional)':'Remarks – select a reason first'}" value="${esc(e.note||'')}">`:''}
+    ${need?`<div class="needmsg">${draft?'Choose a reason. The entry is recorded only after a reason is chosen.':'Reason missing. Choose a reason for this entry.'}</div>`:''}
+    <div class="stamp">${draft?(e._was==='gen'?'Still recorded as Generated until a reason is chosen.':''):stampText(e)}</div>
+  </div>`;
+}
+/* CLAIM_STATUS: AgriStack claimed / unclaimed, shown only after the admin uploads the village's unclaimed-buckets report */
+let CLAIM=null;
+function setClaim(c){
+  if(!c||!Array.isArray(c.unclaimed)){ CLAIM=null; return; }
+  const part=new Map(); Object.keys(c.partly||{}).forEach(k=>{ const id=idOf(k); if(id!==undefined) part.set(id,c.partly[k]); });
+  CLAIM={date:String(c.report||'').split(' · ')[0],un:new Set(c.unclaimed.map(idOf).filter(x=>x!==undefined)),part};
+  if(!FILTERS.some(f=>f[0]==='unc')) FILTERS.push(
+    ['unc','Unclaimed in AgriStack',b=>!!CLAIM&&CLAIM.un.has(b.id)],
+    ['pcl','Partly claimed',b=>!!CLAIM&&CLAIM.part.has(b.id)],
+    ['agc','Claimed + partly claimed',b=>!!CLAIM&&!CLAIM.un.has(b.id)],
+    ['clm','Claimed in AgriStack',b=>!!CLAIM&&!CLAIM.un.has(b.id)&&!CLAIM.part.has(b.id)],
+    ['gunc','Generated here, unclaimed in AgriStack',b=>!!CLAIM&&CLAIM.un.has(b.id)&&ent(b.id).s==='gen']);
+}
+function claimBox(b,e){
+  if(!CLAIM) return '';
+  const un=CLAIM.un.has(b.id), pt=CLAIM.part.get(b.id);
+  const warn=un&&e.s==='gen'?'Recorded here as Generated, but this report still shows it unclaimed.':!un&&e.s==='not'?`Recorded here as Not generated, but AgriStack shows it ${pt?'partly ':''}claimed.`:'';
+  return `<div class="claim ${un?'un':pt?'pt':'cl'}"><span class="ct">AgriStack status</span><b>${un?'Unclaimed':pt?'Partly claimed':'Claimed'}</b><small>as per the report of ${esc(CLAIM.date)}</small>${warn?`<div class="cw">${warn}</div>`:''}</div>`;
+}
+function card(b,group){
+  const e=ent(b.id), covered=group&&gmode(group.id)==='one';
+  const cs=group?group.cs:[];
+  const kh=PLOTMODE[mode]?(KHITS.get(b.id)||[]):[];
+  const khs=new Set(kh.map(h=>h.sv));
+  const pm=new Map();
+  b.v.forEach(v=>v[3].forEach((s,i)=>{const k=v[7][i]+'|'+v[8][i]; if(!pm.has(k)) pm.set(k,{kw:v[7][i],kt:v[8][i],sv:[]}); const p=pm.get(k); if(!p.sv.includes(s)) p.sv.push(s);}));
+  const pairs=[...pm.values()].sort((x,y)=>(parseFloat(x.kw)||0)-(parseFloat(y.kw)||0)||(parseFloat(x.kt)||0)-(parseFloat(y.kt)||0));
+  const cov=covered?(e.s==='gen'?`<div class="cov g">Covered by the group's Farmer ID</div>`:e.s==='not'?`<div class="cov n">Not generated (group entry)</div>`:`<div class="cov">Recorded with the group entry above</div>`):'';
+  return `<article class="bk ${e.s?'filled':''} ${covered?'covered':''} ${kh.length?'match':''}" id="b${b.id}">
+    <div class="info">
+      <div class="top"><span class="bid">Bucket ${b.id}</span><span class="nm">${esc(b.v[0][0])}</span></div>
+      <div class="par">${esc(b.v[0][1])}</div>${b.u?`<div class="uid">AgriStack bucket ID ${esc(b.u)}</div>`:''}
+      <div class="kk">${pairs.map((p,n)=>`<div class="kr c${n%8}"><span class="kl">${p.kw===''&&DATA.noAgri?'Survey nos.':`Khewat ${esc(p.kw)}, Khata ${esc(p.kt)}`}</span><span class="ks">${p.sv.map(x=>khs.has(x)?`<mark class="k">${esc(x)}</mark>`:cs.includes(x)?`<mark title="Shared with the other buckets of this person">${esc(x)}</mark>`:esc(x)).join(', ')}</span></div>`).join('')}</div>
+      ${guidance(b,!!group)}${cov}${covered?claimBox(b,e):''}
+    </div>
+    ${covered?'':`<div class="side">${claimBox(b,e)}${entryPanel('B'+b.id,e,{hint:b.g?linkedIdHint(b):undefined,multi:b.st===3?b.v.length:0})}</div>`}
+  </article>`;
+}
+function groupEntry(g){
+  const e=ent(g.b[0]);
+  return `<div class="gentry">
+    <div class="gsum"><b>One Farmer ID for buckets ${g.b.join(', ')}</b><br>Counts as 1 Farmer ID and ${g.b.length} buckets.</div>
+    ${entryPanel('G'+g.id,e)}
+  </div>`;
+}
+function groupBlock(g,visible){
+  const mode=gmode(g.id);
+  const ids=g.b.map(x=>(ent(x).fid||'').trim()).filter(Boolean), clash=mode==='sep'&&new Set(ids).size>1;
+  return `<section class="group ${g.c==='Medium'?'med':''}" id="g${g.id}">
+    <div class="ghead"><b>Check if same person</b> in buckets ${g.b.join(', ')}?${g.cs.length?` They share khasra ${g.cs.map(esc).join(', ')}.`:''}${g.c==='Medium'?' Spelling differs.':''}</div>
+    <div class="gmode" role="group" aria-label="How was the Farmer ID generated"><span>Farmer ID:</span>
+      <button class="mbtn ${mode==='one'?'on':''}" data-mode="one" data-g="${g.id}" aria-pressed="${mode==='one'}">One Farmer ID for all ${g.b.length}</button>
+      <button class="mbtn ${mode==='sep'?'on':''}" data-mode="sep" data-g="${g.id}" aria-pressed="${mode==='sep'}">Record each bucket separately</button></div>
+    ${clash?`<div class="warnline">Different Farmer IDs entered for these buckets. Check whether they are really one person.</div>`:''}
+    ${mode==='one'?groupEntry(g):''}
+    ${visible.map(b=>card(b,g)).join('')}
+  </section>`;
+}
+
+/* ---------- list ---------- */
+let filter='all', q='', mode='khasra', shown=60;
+const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+const NAMETXT=new Map(DATA.buckets.map(b=>[b.id,norm(b.v.map(v=>v[0]+' '+v[1]).join(' ')+(b.u?' '+b.u:''))]));
+/* ---- khasra search ----
+   Khasra numbers are written many ways: "643/151", "643 / 151", "30 alif", "24min".
+   Typing 643 finds 643 and every 643/... ; typing 151 also finds .../151 ; typing 643/151 finds exactly that.
+   Several numbers can be entered at once, separated by commas. */
+const kn=s=>String(s).toLowerCase().replace(/\s*[\/\\-]\s*/g,'/').replace(/\s+/g,' ').trim();
+function kScore(sv,k){
+  const s=kn(sv); if(s===k) return 4;
+  const segs=s.split('/'), head=segs[0].split(' ')[0];
+  if(segs[0]===k||head===k) return 3;
+  if(k.includes('/')&&s.startsWith(k)) return 2;
+  if(segs.some(x=>x===k||x.split(' ')[0]===k)) return 1;
+  return 0;
+}
+const ALT=new Map(DATA.mismatch.map(r=>[r[5],r[2]]));   // khasra as written in AgriStack where it differs
+const PLOTMODE={khasra:'Khasra'};
+let KQ=[], KHITS=new Map();     // bucket id -> [{sv,kw,kt,pl,owner,score}]
+function computeKhasra(){
+  KHITS=new Map(); KQ=q?q.split(/[,;]+/).map(kn).filter(Boolean):[];
+  if(!KQ.length) return;
+  const score=(sv,kw,kt,pl)=>mode==='khasra'?Math.max(...KQ.map(k=>Math.max(kScore(sv,k),ALT.has(pl)?kScore(ALT.get(pl),k):0))):
+                         Math.max(...KQ.map(k=>kn(mode==='khewat'?kw:kt)===k?4:0));
+  for(const b of DATA.buckets){
+    const hits=[];
+    for(const v of b.v) v[3].forEach((sv,i)=>{const kw=v[7][i],kt=v[8][i],sc=score(sv,kw,kt,v[4][i]); if(sc) hits.push({sv,kw,kt,pl:v[4][i],owner:v[0],score:sc});});
+    if(hits.length) KHITS.set(b.id,hits.sort((a,b)=>b.score-a.score));
+  }
+}
+function hit(b){
+  if(!q) return true;
+  if(PLOTMODE[mode]) return KHITS.has(b.id);
+  if(mode==='bucket') return q.split(/[,;\s]+/).filter(Boolean).some(x=>String(b.id)===x.replace(/\D/g,''));
+  const nq=norm(q); return NAMETXT.get(b.id).includes(nq)||norm(ent(b.id).fid||'').includes(nq);
+}
+const bestScore=b=>PLOTMODE[mode]&&KHITS.has(b.id)?KHITS.get(b.id)[0].score:0;
+const PH={khasra:'Khasra No., e.g. 643/151',khewat:'Khewat No., e.g. 98',khata:'Khata No., e.g. 175',name:'Name or parentage',bucket:'Bucket ID, e.g. 336'};
+const FILTERS=[
+  ['all','All',b=>true],
+  ['open','Not yet filled',b=>!ent(b.id).s],
+  ['gen','Generated',b=>ent(b.id).s==='gen'],
+  ['not','Not generated',b=>ent(b.id).s==='not'],
+  ['nor','Not generated, no reason',b=>ent(b.id).s==='not'&&!ent(b.id).reason],
+  ['linked','Check if same person',b=>!!b.g],
+  ['mixed','May hold more than one person',b=>b.st===3],
+];
+const UNITS=[]; {const seen=new Set();
+  for(const b of DATA.buckets){ if(seen.has(b.id)) continue;
+    if(b.g){const g=GR.get(b.g); g.b.forEach(x=>seen.add(x)); UNITS.push({g,bs:g.b.map(x=>BY.get(x))});}
+    else{seen.add(b.id); UNITS.push({bs:[b]});}}}
+
+function render(){
+  const f=FILTERS.find(x=>x[0]===filter)[2];
+  if(PLOTMODE[mode]) computeKhasra();
+  let n=0, total=0, html='';
+  let list=UNITS;
+  if(filter==='agc'&&CLAIM){                             // fully claimed first, then partly claimed
+    const rank=u=>u.bs.some(b=>!CLAIM.un.has(b.id)&&!CLAIM.part.has(b.id))?0:1;
+    list=UNITS.map((u,i)=>[u,rank(u),i]).sort((a,b)=>a[1]-b[1]||a[2]-b[2]).map(x=>x[0]);
+  }
+  if(q&&PLOTMODE[mode]) list=UNITS.map((u,i)=>[u,Math.max(...u.bs.map(bestScore)),i]).sort((a,b)=>b[1]-a[1]||a[2]-b[2]).map(x=>x[0]);
+  for(const u of list){
+    const vis=u.bs.filter(b=>f(b)&&hit(b)); if(!vis.length) continue;
+    total+=u.bs.length; if(n>=shown) continue;
+    html+=u.g?groupBlock(u.g,u.bs):card(u.bs[0],null);   // a group always shows all its buckets together
+    n+=u.bs.length;
+  }
+  if(total>n) html+=`<button class="more" id="more">Show more</button>`;
+  $('#list').innerHTML=html||`<p class="empty">${q&&PLOTMODE[mode]?`No plot with ${PLOTMODE[mode].toLowerCase()} ${esc(q)}${filter!=='all'?' under this filter':''}.${mode==='khasra'?' Try only the first part of the number, e.g. 643 for 643/151.':' It may be common or government land, see Miscellaneous information.'}`:'Nothing matches. Clear the search or pick another filter.'}</p>`;
+  let info='';
+  if(q&&PLOTMODE[mode]&&KHITS.size){
+    const plots=[...KHITS.values()].reduce((a,h)=>a+h.length,0);
+    info=`${PLOTMODE[mode]} <b>${esc(q)}</b>: ${plots} plot${plots>1?'s':''} in ${KHITS.size} bucket${KHITS.size>1?'s':''}.${mode==='khasra'?' Exact matches are shown first.':''}`;
+  }
+  $('#qinfo').innerHTML=info;
+  stats();
+}
+
+$('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip'); if(!c) return; filter=c.dataset.f; shown=60; render();});
+document.addEventListener('click',e=>{ if(e.target.id!=='agbtn') return; filter=filter==='agc'?'all':'agc'; shown=60; render(); $('#chips').scrollIntoView({behavior:'smooth',block:'start'}); });
+let qt; $('#q').addEventListener('input',e=>{clearTimeout(qt); qt=setTimeout(()=>{q=e.target.value.trim(); shown=60; render(); window.scrollTo({top:Math.min(window.scrollY,$('header').offsetHeight)});},200)});
+function setMode(m){mode=m; document.querySelectorAll('.smode button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
+  $('#q').placeholder=PH[m]; $('#q').setAttribute('inputmode',m==='khasra'||m==='name'?'text':'numeric'); shown=60; render(); $('#q').focus();}
+document.querySelector('.smode').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) setMode(b.dataset.m);});
+$('#q').placeholder=PH.khasra;
+
+/* ---------- editing ---------- */
+function who(){ if(APPS_SCRIPT_URL&&!PIN){ askPin(); return ''; } return SESSION.username; }
+function targets(t){ // bucket ids affected by an entry panel
+  if(t[0]==='G'){const g=GR.get(+t.slice(1)); return g.b.map(id=>({id,shared:g.id}));}
+  return [{id:+t.slice(1),shared:0}];
+}
+function apply(t,patch){
+  const w=who(); if(!w) return false;
+  for(const {id,shared} of targets(t)){
+    E['B'+id]={...ent(id),...patch,shared:shared||0,by:w,at:Date.now(),synced:false};
+    queue(id);
+  }
+  persist(); return true;
+}
+$('#list').addEventListener('click',e=>{
+  if(e.target.id==='more'){shown+=60; render(); return;}
+  const mb=e.target.closest('.mbtn');
+  if(mb){ const gid=+mb.dataset.g, mode=mb.dataset.mode, g=GR.get(gid);
+    if(gmode(gid)===mode) return; if(!who()) return; DRAFT.clear();
+    if(mode==='one'){
+      const filled=g.b.map(ent).filter(x=>x.s);
+      const differ=new Set(filled.map(x=>x.s+'|'+(x.fid||'')+'|'+(x.reason||''))).size>1;
+      if(differ&&!confirm('These buckets have different entries. Use the first filled bucket\'s entry for all of them?')) return;
+      E['G'+gid]={mode:'one'};
+      const base=filled[0]; if(base) apply('G'+gid,{s:base.s,fid:base.fid||'',reason:base.reason||'',note:base.note||'',n:1});
+      else g.b.forEach(id=>{E['B'+id]={...ent(id),shared:gid}; });
+    }else{
+      E['G'+gid]={mode:'sep'};
+      g.b.forEach(id=>{ if(ent(id).s) apply('B'+id,{}); else E['B'+id]={...ent(id),shared:0}; });
+    }
+    persist(); render(); toast(mode==='one'?`Buckets ${g.b.join(', ')} now share one Farmer ID`:'Each bucket recorded separately'); return;}
+  const panel=e.target.closest('.entry'); if(!panel) return; const t=panel.dataset.t;
+  const sb=e.target.closest('.sbtn');
+  if(sb){ const s=sb.dataset.s; const cur=t[0]==='G'?ent(GR.get(+t.slice(1)).b[0]):ent(+t.slice(1));
+    if(s==='not'){                                       // nothing is recorded yet: first a reason must be chosen
+      if(DRAFT.has(t)||cur.s==='not') return; if(!who()) return;
+      DRAFT.add(t); render(); const sel=document.querySelector(`[data-t="${t}"] select[data-f=reason]`); sel&&sel.focus(); return; }
+    if(DRAFT.has(t)){ DRAFT.delete(t); if(cur.s===s){ render(); return; } }
+    if(cur.s===s) return;
+    if(apply(t,{s,n:1,fid:'',...(s==='gen'?{reason:'',note:''}:{})})){render(); toast(`${t[0]==='G'?'Buckets '+targets(t).map(x=>x.id).join(', '):'Bucket '+t.slice(1)}: ${STATUS[s]}`);
+      const next=document.querySelector(`[data-t="${t}"] select[data-f=reason]`); next&&next.focus();}
+    return;}
+  if(e.target.dataset.use){ if(apply(t,{fid:e.target.dataset.use})){render(); toast('Same Farmer ID applied');} return;}
+  if(e.target.closest('[data-reset]')){
+    if(DRAFT.has(t)){ DRAFT.delete(t); render(); return; }          // a draft is simply dropped; nothing was recorded
+    const ids=targets(t).map(x=>x.id);
+    if(!confirm(ids.length>1?`Remove the entry for buckets ${ids.join(', ')}?`:`Remove the entry for bucket ${ids[0]}?`)) return;
+    if(apply(t,{s:'',fid:'',reason:'',note:'',n:1})){render(); toast(ids.length>1?`Buckets ${ids.join(', ')} reset`:`Bucket ${ids[0]} reset`);} }
+});
+$('#list').addEventListener('change',e=>{
+  const panel=e.target.closest('.entry'); if(!panel||!e.target.dataset.f) return;
+  const t=panel.dataset.t, f=e.target.dataset.f;
+  let v=e.target.value.trim(); if(f==='fid'){v=v.toUpperCase(); e.target.value=v;} if(f==='n') v=+v;
+  const REMARKS_NEED_REASON=true;                       // remarks can be typed only after a reason is chosen
+  if(f==='reason'&&DRAFT.has(t)){                        // the reason completes the entry: now it is recorded and saved
+    if(!v) return;
+    if(apply(t,{s:'not',n:1,fid:'',reason:v,note:''})){ DRAFT.delete(t); render();
+      toast(`${t[0]==='G'?'Buckets '+targets(t).map(x=>x.id).join(', '):'Bucket '+t.slice(1)}: ${STATUS.not}`);
+      const nb=document.querySelector(`[data-t="${t}"] input[data-f=note]`); nb&&nb.focus(); }
+    else render();
+    return; }
+  if(f==='reason'&&!v){ e.target.value=ent(targets(t)[0].id).reason||''; toast('A reason is needed. Use Reset to remove the entry.'); return; }
+  if(f==='note'&&!ent(targets(t)[0].id).reason){ e.target.value=''; return; }
+  if(!apply(t,{[f]:v})){ if(f==='reason') render(); return; }
+  if(f==='reason'){ const nb=panel.querySelector('input[data-f=note]');
+    if(nb){ nb.disabled=!v; nb.placeholder=v?'Remarks (optional)':'Remarks – select a reason first'; if(!v) nb.value=''; } }
+  const st=panel.querySelector('.stamp'); if(st) st.innerHTML=stampText(ent(targets(t)[0].id));
+  // refresh hints in the same group without rebuilding the field being edited
+  const id=targets(t)[0].id, b=BY.get(id);
+  if(b.g&&f==='fid') GR.get(b.g).b.forEach(x=>{const h=document.querySelector(`#b${x} .hint`); if(h) h.innerHTML=linkedIdHint(BY.get(x));});
+  stats();
+});
+function toast(t){const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),1800);}
+
+/* ---------- row sent to the sheet / CSV ---------- */
+function rowFor(id){
+  const b=BY.get(id), e=ent(id);
+  let guide='';
+  if(b.g){const g=GR.get(b.g); guide=`Check if same person as bucket ${g.b.filter(x=>x!==id).join(', ')}`;}
+  if(b.st===3) guide+=(guide?'; ':'')+'May hold more than one person';
+  const shared=e.shared?GR.get(e.shared).b:[];
+  return {village:VILLAGE,bucket_id:b.u??id,owner:b.v[0][0],parentage:b.v[0][1],
+    other_names:b.v.slice(1).map(v=>v[0]+' / '+v[1]).join(' | '),plots:plotsOf(b),
+    survey_nos:[...new Set(b.v.flatMap(v=>v[3]))].join(', '),
+    khewat_nos:[...new Set(b.v.flatMap(v=>v[7]))].join(', '),khata_nos:[...new Set(b.v.flatMap(v=>v[8]))].join(', '),area_ha:b.e,group:b.g||'',guidance:guide,
+    status:e.s?STATUS[e.s]:'',
+    id_basis:e.s?(e.shared?`One ID for buckets ${shared.join(', ')}`:(e.s==='gen'&&(+e.n||1)>1?`${e.n} IDs for this bucket`:'Own entry')):'',
+    ids_counted:e.s==='gen'?(e.shared?(shared[0]===id?1:0):(+e.n||1)):0,
+    farmer_id:e.fid||'',reason:e.reason||'',remarks:e.note||'',
+    submitted_by:e.s||e.note?e.by||'':'',submitted_at:e.at?new Date(e.at).toISOString():''};
+}
+
+/* ---------- server calls (open entry: no username or password) ---------- */
+try{REASONS=JSON.parse(localStorage.getItem('farmerIdReasons')||'[]')}catch(e){}
+function setReasons(list){ if(!Array.isArray(list)) return; REASONS=list; try{localStorage.setItem('farmerIdReasons',JSON.stringify(list))}catch(e){} }
+const NKEY='farmerIdName';
+let NAME=''; try{NAME=localStorage.getItem(NKEY)||''}catch(e){}
+const SESSION={get username(){return NAME||'Public';}};      // the optional name is saved with each entry
+/* Viewing is open to all. Entering or changing data needs the common edit PIN.
+   The PIN is kept only while this page is open: it is asked again whenever the page is opened or reloaded. */
+const PIN_KEPT='page-only';
+let PIN=''; try{ localStorage.removeItem('farmerIdPin'); sessionStorage.removeItem('farmerIdPin'); }catch(e){}   // forget a PIN remembered by an earlier version
+let lastBtn=null;
+document.addEventListener('click',e=>{ const b=e.target.closest('#list button'); if(b) lastBtn=b; },true);
+/* One call to the Google Sheet. When Google is busy it answers with an error page instead of data
+   ("Unexpected token '<'"). The call is then tried again by itself a few times before anything is shown. */
+async function sheetCall(url,payload,tries=4){
+  let said='', net=false;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      const text=await r.text(); net=false;
+      try{ const j=JSON.parse(text); if(!(j&&j.busy)) return j; said=''; }
+      catch(_){ said=text.replace(/<(script|style)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim().slice(0,90); }
+    }catch(e){ net=true; }
+    if(i<tries-1) await new Promise(res=>setTimeout(res,[1500,3500,7000][i]+Math.random()*1200));
+  }
+  const e=new Error(net?'no connection to the Google Sheet':'the Google Sheet is busy'+(said?' – Google said “'+said+'”':'')); e.busy=true; throw e;
+}
+async function api(action,payload={}){
+  const j=await sheetCall(APPS_SCRIPT_URL,{action,village:VILLAGE,tehsil:TEHSIL,name:NAME,pin:PIN,...payload});
+  if(!j.ok){ const e=new Error(j.error||'Request failed'); e.pin=!!j.pin; if(e.pin){ setPin(''); askPin(j.error); } throw e; }
+  return j;
+}
+function setPin(p){ PIN=p; setAcct(); }
+function askPin(msg){ $('#perr').textContent=msg||''; $('#pinbox').hidden=false; $('#pin').value=''; setTimeout(()=>$('#pin').focus(),50); }
+$('#pform').addEventListener('submit',async e=>{
+  e.preventDefault(); const p=$('#pin').value.trim(); if(!p) return;
+  $('#pbtn').disabled=true; $('#perr').textContent='';
+  try{
+    PIN=p; await api('checkPin');
+    setPin(p); $('#pinbox').hidden=true; toast('Editing mode on');
+    if(pending.size) flush();
+    const b=lastBtn; lastBtn=null; if(b&&document.body.contains(b)) b.click();
+  }catch(err){ PIN=''; $('#perr').textContent=err.pin?'Wrong PIN':err.message; $('#pin').select(); }
+  finally{ $('#pbtn').disabled=false; }
+});
+$('#pcancel').addEventListener('click',()=>{ $('#pinbox').hidden=true; lastBtn=null; });
+function setAcct(){
+  $('#acct').innerHTML=APPS_SCRIPT_URL?(PIN?`<span class="lk on">Editing mode</span> <button class="linkbtn" id="lock">Exit editing</button> <label class="nm-l" for="myname">Your name</label> <input class="nm-i" id="myname" placeholder="optional" value="${esc(NAME)}" autocomplete="name">`:''):'Not connected to Google Sheets – entries stay on this device';
+}
+document.addEventListener('click',e=>{
+  if(e.target.id==='lock'){ if(pending.size&&!confirm('Some entries are not saved yet. Exit editing anyway? They will be sent after the PIN is entered again.')) return; setPin(''); setSync(); toast('Editing mode off – view only'); }
+});
+document.addEventListener('change',e=>{ if(e.target.id!=='myname') return; NAME=e.target.value.trim().slice(0,40); try{localStorage.setItem(NKEY,NAME)}catch(_){} });
+
+/* ---------- Google Sheets sync ---------- */
+const pending=new Set(Object.keys(E).filter(k=>k[0]==='B'&&!E[k].synced).map(k=>+k.slice(1)));
+let timer=null, busy=false;
+function queue(id){pending.add(id); setSync(); if(!timer) timer=setTimeout(flush,2500);}      // entries made within a few seconds are sent together
+async function flush(){
+  clearTimeout(timer); timer=null;
+  if(!APPS_SCRIPT_URL||busy||!pending.size||!PIN) return setSync();
+  busy=true; setSync('busy');
+  const ids=[...pending].slice(0,60);
+  try{
+    await api('openSave',{items:ids.map(rowFor)});
+    ids.forEach(id=>{pending.delete(id); if(E['B'+id]) E['B'+id].synced=true; const st=document.querySelector(`[data-t="B${id}"] .stamp`); if(st) st.innerHTML=stampText(ent(id));});
+    persist(); busy=false; setSync(); if(pending.size&&!timer) timer=setTimeout(flush,1000);
+  }catch(err){busy=false; if(err.pin){ setSync(); return; } setSync('err',err.message); clearTimeout(timer); timer=setTimeout(flush,9000+Math.random()*4000);}
+}
+function setSync(state,msg){
+  const el=$('#sync'), t=el.querySelector('span'); el.className='sync';
+  if(!APPS_SCRIPT_URL){t.textContent='Saved on this device only'; return;}
+  if(!PIN&&state!=='busy'&&state!=='err'&&state!=='loaderr'){ t.textContent=pending.size?`${pending.size} waiting – enter the PIN to save`:'View only. Tap Generated or Not generated on a bucket to edit.'; return; }
+  if(!SESSION){ if(state==='err'){el.classList.add('err'); t.textContent=`Could not load entries (${msg})`;} else if(state==='busy'){el.classList.add('busy'); t.textContent='Loading entries…';} else t.textContent='View only. Log in to enter data.'; return; }
+  if(state==='busy'){el.classList.add('busy'); t.textContent=busy?'Saving to Google Sheet…':'Loading entries…'; return;}
+  if(state==='loaderr'){el.classList.add('err'); t.textContent=msg; return;}
+  if(state==='err'){el.classList.add('err'); t.textContent=`${pending.size} not saved yet (${msg}). Trying again by itself.`; return;}
+  if(pending.size){el.classList.add('busy'); t.textContent=`${pending.size} waiting to save`; return;}
+  el.classList.add('ok'); t.textContent='All entries saved to Google Sheet';
+}
+let loadTries=0;
+async function load(){
+  if(!APPS_SCRIPT_URL) return;
+  if(!pending.size) setSync('busy');
+  try{
+    const j=await api('openList');
+    const seen=new Set(j.items.filter(it=>it.status).map(it=>idOf(it.bucket_id)));
+    // entries cleared elsewhere: drop saved local copies that the sheet no longer has
+    for(const k of Object.keys(E)) if(k[0]==='B'&&E[k].synced&&E[k].s&&!seen.has(+k.slice(1))) E[k]={...E[k],s:'',reason:'',note:'',fid:'',shared:0};
+    setReasons(j.reasons); setClaim(j.claim);
+    const rev={'Claimed':'gen','Not claimed':'not','Generated':'gen','Not generated':'not'};
+    for(const it of j.items){
+      const id=idOf(it.bucket_id); if(id===undefined) continue; const at=Date.parse(it.submitted_at)||0, loc=E['B'+id];
+      if(loc&&!loc.synced&&(loc.at||0)>at) continue;
+      const b=BY.get(id); if(!b) continue;
+      const shared=/^One ID for buckets/.test(it.id_basis||'')?b.g:0;
+      const n=+(String(it.id_basis||'').match(/^(\d+) IDs/)||[])[1]||1;
+      E['B'+id]={s:rev[it.status]||'',fid:it.farmer_id||'',reason:it.reason||'',note:it.remarks||'',n,shared,by:it.submitted_by||'',at,synced:true};
+      if(shared) E['G'+shared]={mode:'one'};
+    }
+    loadTries=0; persist(); render(); setSync(); if(pending.size) flush();
+  }catch(err){                                           // entries could not be read: keep trying by itself, the page stays usable
+    if(err.pin) return;
+    if(++loadTries<=6){ setSync('loaderr',`Entries made by others are not loaded yet (${err.message}). Trying again by itself.`); setTimeout(load,10000+Math.random()*5000); }
+    else setSync('loaderr',`Entries made by others could not be loaded (${err.message}). Reload the page after a minute.`);
+  }
+}
+window.addEventListener('beforeunload',e=>{if(APPS_SCRIPT_URL&&pending.size){e.preventDefault(); e.returnValue='';}});
+/* ---------- REPORT_DOWNLOADS: the buckets with their entries as they stand now, as PDF or Excel ----------
+   Order: Not generated (grouped by reason, in the order of the reasons list), then Not yet filled, then Generated. */
+function reportRows(){
+  const order=new Map(REASONS.map((r,i)=>[r,i]));
+  const rows=DATA.buckets.map(b=>{
+    const e=ent(b.id), pm=new Map();
+    b.v.forEach(v=>v[3].forEach((s,i)=>{ const k=v[7][i]+'|'+v[8][i]; if(!pm.has(k)) pm.set(k,{kw:v[7][i],kt:v[8][i],sv:[]}); const p=pm.get(k); if(!p.sv.includes(s)) p.sv.push(s); }));
+    const land=[...pm.values()].sort((x,y)=>(parseFloat(x.kw)||0)-(parseFloat(y.kw)||0)||(parseFloat(x.kt)||0)-(parseFloat(y.kt)||0))
+      .map(p=>`${p.kw!==''&&p.kw!=null?'Khewat '+p.kw+', Khata '+p.kt:(DATA.noAgri?'Survey nos.':'Khewat / Khata not found')}: ${p.sv.join(', ')}`);
+    const cat=e.s==='not'?0:e.s==='gen'?2:1;
+    return {id:b.id,name:b.v[0][0],par:b.v[0][1],land,status:e.s==='gen'?'Generated':e.s==='not'?'Not generated':'Not yet filled',
+      reason:e.s==='not'?(e.reason||''):'',remarks:e.note||'',cat,ro:e.s==='not'?(e.reason?(order.has(e.reason)?order.get(e.reason):900):999):0};
+  });
+  rows.sort((a,b)=>a.cat-b.cat||a.ro-b.ro||(a.cat===0?String(a.reason).localeCompare(String(b.reason)):0)||a.id-b.id);
+  return rows;
+}
+function reportCounts(rows){ const c={not:0,open:0,gen:0}; rows.forEach(r=>{ if(r.cat===0) c.not++; else if(r.cat===1) c.open++; else c.gen++; }); return c; }
+function reportName(ext){ return `farmer_id_${(VILLAGE||'village').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${new Date().toISOString().slice(0,10)}.${ext}`; }
+function loadJs(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>{ s.remove(); rej(new Error('could not load')); }; document.head.appendChild(s); }); }
+async function needLib(test,urls,what){ if(test()) return; for(const u of urls){ try{ await loadJs(u); if(test()) return; }catch(e){} } throw new Error(`the ${what} maker could not load – check the internet connection`); }
+function saveBlob(data,name,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+/* the PDF's built-in font has English letters only: Urdu letters are written out (ب → bay) */
+const URDU_L={'الف':'alif','ا':'alif','ب':'bay','پ':'pay','ت':'tay','ٹ':'ttay','ث':'say','ج':'jeem','چ':'chay','ح':'hay','خ':'khay','د':'daal','ڈ':'ddaal','ذ':'zaal','ر':'ray','ز':'zay','س':'seen','ش':'sheen','ص':'suad','ض':'zuad','ط':'toay','ظ':'zoay','ع':'ain','غ':'ghain','ف':'fay','ق':'qaaf','ک':'kaaf','گ':'gaaf','ل':'laam','م':'meem','ن':'noon','و':'wao','ہ':'hay','ه':'hay','ی':'yay','ي':'yay','ے':'yay'};
+const pdfT=s=>String(s??'').replace(/[؀-ۿ]+/g,w=>URDU_L[w]||[...w].map(c=>URDU_L[c]||'').filter(Boolean).join('-')||'?').replace(/[^\n\x20-\x7E -ÿ–—‘’“”•]/g,'?');
+async function reportPdf(){
+  await needLib(()=>window.jspdf&&window.jspdf.jsPDF,['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'],'PDF');
+  await needLib(()=>window.jspdf.jsPDF.API.autoTable,['https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js','https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'],'PDF');
+  const rows=reportRows(), c=reportCounts(rows), doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), M=28, body=[], kinds=[];
+  let last=null;
+  rows.forEach(r=>{
+    const sec=r.cat===0?'Not generated – '+(r.reason||'no reason given'):r.cat===1?'Not yet filled':'Generated';
+    if(sec!==last){ const n=rows.filter(x=>(x.cat===0?'Not generated – '+(x.reason||'no reason given'):x.cat===1?'Not yet filled':'Generated')===sec).length;
+      body.push([{content:pdfT(`${sec}  (${n})`),colSpan:7}]); kinds.push('h'+r.cat); last=sec; }
+    body.push([String(r.id),pdfT(r.name),pdfT(r.par),pdfT(r.land.join('\n')),r.status,pdfT(r.reason),pdfT(r.remarks)]); kinds.push('r'+r.cat);
+  });
+  const when=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+  doc.autoTable({
+    head:[['Bucket no.','Name','Parentage','Khewat, Khata, Khasra','Farmer ID status','Reason (if not generated)','Remarks']],
+    body, startY:64, margin:{left:M,right:M,top:52,bottom:30}, theme:'grid',
+    styles:{font:'helvetica',fontSize:8.4,cellPadding:4,valign:'top',lineColor:[201,208,214],lineWidth:.5,textColor:[28,42,54],overflow:'linebreak'},
+    headStyles:{fillColor:[28,42,54],textColor:255,fontStyle:'bold'},
+    columnStyles:{0:{cellWidth:48,halign:'center',fontStyle:'bold'},1:{cellWidth:110},2:{cellWidth:105},3:{cellWidth:220},4:{cellWidth:72},5:{cellWidth:140},6:{cellWidth:'auto'}},
+    rowPageBreak:'avoid',
+    didParseCell:x=>{ if(x.section!=='body') return; const k=kinds[x.row.index];
+      if(k[0]==='h'){ x.cell.styles.fontStyle='bold'; x.cell.styles.fontSize=9; x.cell.styles.fillColor=k==='h0'?[248,227,220]:k==='h2'?[230,240,234]:[236,238,233]; x.cell.styles.textColor=k==='h0'?[168,67,42]:k==='h2'?[47,107,79]:[74,90,103]; }
+      else if(x.column.index===4) x.cell.styles.textColor=k==='r0'?[168,67,42]:k==='r2'?[47,107,79]:[124,138,149]; },
+    didDrawPage:()=>{
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(28,42,54); doc.text(pdfT(`Farmer ID status by bucket – ${VILLAGE}, District Kupwara`),M,30);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,104,115);
+      doc.text(`${rows.length} buckets · Not generated ${c.not} · Not yet filled ${c.open} · Generated ${c.gen} · as on ${when}`,M,44);
+      doc.setFontSize(8); doc.text('Page '+doc.internal.getNumberOfPages(),W-M,doc.internal.pageSize.getHeight()-14,{align:'right'});
+    }
+  });
+  saveBlob(doc.output('arraybuffer'),reportName('pdf'),'application/pdf');
+}
+async function reportXlsx(){
+  await needLib(()=>window.ExcelJS,['https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js','https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'],'Excel');
+  const rows=reportRows(), c=reportCounts(rows), wb=new window.ExcelJS.Workbook();
+  const ws=wb.addWorksheet('Buckets',{views:[{state:'frozen',ySplit:1}],pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:1'}});
+  ws.columns=[['Bucket no.',10],['Name',24],['Parentage',22],['Khewat, Khata, Khasra',50],['Farmer ID status',16],['Reason (if not generated)',38],['Remarks',30]].map(([header,width])=>({header,width}));
+  rows.forEach(r=>{ let l=r.land.join('\n'); if(l.length>32000){ const k=l.slice(0,l.lastIndexOf('\n',31900)); l=k+'\n… and '+(r.land.length-k.split('\n').length)+' more (too long for one Excel cell)'; } ws.addRow([r.id,r.name,r.par,l,r.status,r.reason,r.remarks]); });
+  const thin={style:'thin',color:{argb:'FFC9D0D6'}};
+  ws.getRow(1).eachCell(x=>{ x.font={bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1C2A36'}}; x.alignment={vertical:'middle',wrapText:true}; x.border={top:thin,left:thin,bottom:thin,right:thin}; });
+  rows.forEach((r,i)=>{ const row=ws.getRow(i+2), fill=r.cat===0?'FFF8E3DC':r.cat===2?'FFE6F0EA':null;
+    for(let k=1;k<=7;k++){ const x=row.getCell(k); x.alignment={vertical:'top',wrapText:true}; x.border={top:thin,left:thin,bottom:thin,right:thin}; if(fill&&k===5) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}}; }
+    row.getCell(1).alignment={vertical:'top',horizontal:'center'}; row.getCell(1).font={bold:true}; });
+  ws.autoFilter={from:{row:1,column:1},to:{row:rows.length+1,column:7}};
+  const s=wb.addWorksheet('Summary'), when=new Date().toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const byR=new Map(); rows.filter(r=>r.cat===0).forEach(r=>byR.set(r.reason||'(no reason given)',(byR.get(r.reason||'(no reason given)')||0)+1));
+  [['Village',VILLAGE],['District','Kupwara'],['As on',when],[],['Total buckets',rows.length],['Not generated',c.not],['Not yet filled',c.open],['Generated',c.gen],[],['Not generated, by reason','Buckets']]
+    .concat([...byR.entries()]).forEach(r=>s.addRow(r));
+  s.getColumn(1).width=48; s.getColumn(2).width=24; [1,5,10].forEach(n=>s.getRow(n).font={bold:true});
+  saveBlob(await wb.xlsx.writeBuffer(),reportName('xlsx'),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('#dl-pdf,#dl-xls'); if(!b) return;
+  const label=b.textContent; b.disabled=true; b.textContent='Preparing…';
+  try{ await (b.id==='dl-pdf'?reportPdf():reportXlsx()); }catch(err){ toast(err.message); }
+  b.disabled=false; b.textContent=label;
+});
+
+
+$('#csv').addEventListener('click',()=>{
+  const rows=DATA.buckets.map(b=>rowFor(b.id)), cols=Object.keys(rows[0]);
+  const csv=[cols.join(',')].concat(rows.map(o=>cols.map(c=>`"${String(o[c]).replace(/"/g,'""')}"`).join(','))).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
+  a.download=`farmer_id_by_bucket_${(VILLAGE||'village').replace(/\W+/g,'_')}.csv`; a.click();
+});
+
+/* ---------- miscellaneous information ---------- */
+function miscHtml(){ if(DATA.noAgri) return `<p>No AgriStack village file was available for ${esc(VILLAGE||'this village')} when this page was made, so khewat and khata numbers are not shown. Each bucket shows its survey numbers from the AgriStack bucket data.</p>`;
+  const X=DATA.extra, isInd=r=>!/^(na|sarkar|)$/i.test(String(r[1]).trim());
+  const ind=X.filter(isInd), non=X.filter(r=>!isInd(r));
+  const cat=r=>{const n=r[0].toLowerCase();
+    if(/aabadi|abadi/.test(n)) return 'Aabadi Deh'; if(/shamilat/.test(n)) return 'Shamilat';
+    if(/ring road|nhai|sarkar/.test(n)) return 'Sarkar / Ring Road / NHAI'; if(/road|khhad|ghadh/.test(n)) return 'Roads and other public use';
+    if(/imambada|shia|ahli islam|ahl /.test(n)) return 'Religious / community'; if(/maqbooza|makbooza/.test(n)) return 'Maqbooza (departments, canals, panchayat)'; return 'Other';};
+  const groups={}; non.forEach(r=>(groups[cat(r)]=groups[cat(r)]||[]).push(r));
+  const tbl=(rows,owner=true)=>`<div class="mtwrap"><table class="mt"><thead><tr>${owner?'<th>Owner</th><th>Parentage</th>':'<th>Recorded as</th>'}<th>Khasra</th><th>Khewat</th><th>Khata</th><th>Hectare</th><th>Holder</th></tr></thead><tbody>${rows.map(r=>`<tr>${owner?`<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`:`<td>${esc(r[0])}</td>`}<td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${r[5].toFixed(4)}</td><td>${esc(r[6])}</td></tr>`).join('')}</tbody></table></div>`;
+  const indNames=[...new Map(ind.map(r=>[r[0]+'|'+r[1],r])).values()].map(r=>`${esc(r[0])} s/o ${esc(r[1])} (${ind.filter(x=>x[0]===r[0]&&x[1]===r[1]).length} plot${ind.filter(x=>x[0]===r[0]&&x[1]===r[1]).length>1?'s':''})`);
+  const M=DATA.mismatch;
+  return `<p>The AgriStack record for ${esc(VILLAGE||'this village')} has ${DATA.agriPlots.toLocaleString()} plots in ${DATA.khewats} khewats and ${DATA.khatas} khatas. Every plot in the bucket data was found in it, with matching owner, parentage and area.</p>
+  <h3>Extra plots in AgriStack: ${X.length} plots are not in any bucket</h3>
+  <p>${non.length} are non-individual land: ${Object.keys(groups).join(', ')}. The other ${ind.length} look like individuals left out of the buckets: ${indNames.join(', ')}.</p>
+  <h3>Individuals without a bucket</h3>${tbl(ind)}
+  <h3>Non-individual land</h3>
+  ${Object.entries(groups).map(([k,rows])=>`<details class="cat"><summary>${esc(k)}: ${rows.length} plot${rows.length>1?'s':''}, ${rows.reduce((a,r)=>a+r[5],0).toFixed(4)} ha</summary>${tbl(rows,false)}</details>`).join('')}
+  ${M.length?`<h3>Khasra recorded differently</h3><p>In ${M.length===1?'this plot':'these plots'} the bucket data and AgriStack give a different khasra number. Correct the bucket data.</p>
+  <div class="mtwrap"><table class="mt"><thead><tr><th>Bucket</th><th>In bucket data</th><th>In AgriStack</th><th>Khewat</th><th>Khata</th><th>Plot ID</th></tr></thead><tbody>${M.map(r=>`<tr><td>${r[0]}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+}
+$('#misc').addEventListener('click',()=>{$('#miscBody').innerHTML=miscHtml(); $('#miscDlg').showModal();});
+$('#miscClose').addEventListener('click',()=>$('#miscDlg').close());
+$('#miscDlg').addEventListener('click',e=>{if(e.target.id==='miscDlg') $('#miscDlg').close();});
+
+setAcct(); render(); setSync(); if(APPS_SCRIPT_URL) load();
+</script>
+</body>
+</html>
