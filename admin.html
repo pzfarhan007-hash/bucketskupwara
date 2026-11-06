@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="config.js"></script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin – Farmer ID by Bucket, Kupwara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<script>
+/* ============ SETTINGS ============ */
+const APPS_SCRIPT_URL = (window.PORTAL_URL||"").trim();   // the portal's Apps Script /exec URL (set by the portal page updater)
+</script>
+<style>
+:root{--ink:#1c2a36;--ink-2:#4a5a67;--ink-3:#7c8a95;--paper:#f5f6f3;--card:#fff;--line:#dde2dc;--line-2:#eceee9;--card-line:#c9d0d6;
+  --field:#2f6b4f;--field-bg:#e6f0ea;--amber:#c98a1b;--amber-ink:#8a5a10;--amber-bg:#fbf1dc;--brick:#a8432a;--brick-bg:#f8e3dc;--grey:#d5dad6;--slate:#43607a;--slate-bg:#e3eaf1;--focus:#2a6fdb}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#e6ebef;--ink-2:#b3bec7;--ink-3:#86939d;--paper:#141a1f;--card:#1c242b;--line:#2f3a43;--line-2:#252f37;--card-line:#3a4650;
+  --field:#6cc19a;--field-bg:#1e3329;--amber:#e2a93b;--amber-ink:#f0c677;--amber-bg:#3a2d17;--brick:#ef8f76;--brick-bg:#3b231d;--grey:#3a4650;--slate:#9ab8d3;--slate-bg:#22303d}}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a{color:var(--slate)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:22px 0 8px}
+header.top .t{flex:1;min-width:240px}
+h1{font:600 26px/1.15 "IBM Plex Serif",Georgia,serif;margin:0}
+.crumb{font-size:14px;color:var(--ink-2);margin-top:2px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:6px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0;background:none;padding:11px 14px 10px;cursor:pointer;color:var(--ink-2);border-bottom:3px solid transparent;font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.panel{padding-top:18px}
+.lead{color:var(--ink-2);margin:0 0 14px;max-width:75ch}
+.card{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(20,30,40,.05)}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card h2 small{font-weight:400;color:var(--ink-3);font-size:13px}
+.card h2 .sp{flex:1}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.sc{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:14px 16px;border-top:4px solid var(--ink-3)}
+.sc b{display:block;font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sc span{font-size:13px;color:var(--ink-2)}
+.sc small{display:block;font-size:12px;color:var(--ink-3)}
+.sc.g{border-top-color:var(--field)} .sc.g b{color:var(--field)}
+.sc.a{border-top-color:var(--amber)} .sc.a b{color:var(--amber-ink)}
+.sc.r{border-top-color:var(--grey)}
+.sc.i{border-top-color:var(--slate)} .sc.i b{color:var(--slate)}
+.sc.b{border-top-color:var(--brick)} .sc.b b{color:var(--brick)}
+.prog{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.prog b{font-size:30px;font-variant-numeric:tabular-nums}
+.bar{height:12px;border-radius:6px;background:var(--grey);overflow:hidden;display:flex;margin-top:8px}
+.bar i{display:block;height:100%}
+.bar.s{height:7px;margin:0;width:110px;border-radius:4px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink-2);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:12px;font-weight:600;color:var(--ink-3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.l,td.l{text-align:left}
+th.s{cursor:pointer} th.s:hover{color:var(--ink)} th.s[aria-sort]::after{content:" ▾"} th.s[aria-sort="ascending"]::after{content:" ▴"}
+td{padding:9px 10px;border-bottom:1px solid var(--line-2);text-align:right;font-size:14px;white-space:nowrap}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--paper)}
+tr.tot td{font-weight:600;border-top:2px solid var(--line);border-bottom:0}
+.pc{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.g{color:var(--field)} .a{color:var(--amber-ink)} .i{color:var(--slate)} .n{color:var(--brick)} .muted{color:var(--ink-3)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.in{border:1px solid var(--line);border-radius:8px;padding:8px 11px;background:var(--card)}
+.search{flex:1 1 220px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500}
+.btn.sec{background:var(--card);color:var(--ink)}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.reasons .r{display:grid;grid-template-columns:minmax(160px,340px) 1fr 70px 132px;gap:10px;align-items:center;font-size:14px;padding:5px 0}
+.reasons .rh{font-size:12px;font-weight:600;color:var(--ink-3);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:2px}
+.reasons .rh .rn{color:var(--ink-3)}
+.reasons .rtot{border-top:2px solid var(--line);margin-top:4px;padding-top:8px;font-weight:600}
+.reasons .rtot .rn{color:var(--ink)}
+.split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 18px;margin-bottom:10px}
+.sp{border-left:4px solid var(--ink-3);padding-left:10px}
+.sp b{display:block;font-size:24px;line-height:1.15;font-variant-numeric:tabular-nums}
+.sp span{font-size:13px;color:var(--ink-2)} .sp small{display:block;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.sp.g{border-color:var(--field)} .sp.g b{color:var(--field)} .sp.a{border-color:var(--amber)} .sp.a b{color:var(--amber-ink)}
+h3.rt{font-size:14px;margin:18px 0 6px}
+.reasons .rb{height:9px;border-radius:5px;background:var(--line);overflow:hidden}
+.reasons .rb i{display:block;height:100%;background:var(--amber)}
+.reasons .rn{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.pill{font-size:12px;border-radius:5px;padding:1px 7px;margin-left:4px}
+.pill.off{background:var(--brick-bg);color:var(--brick)} .pill.new{background:var(--line-2);color:var(--ink-3)}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 14px;align-items:end}
+.form .xl{grid-column:1/-1}
+.form label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+.form .in{width:100%}
+.msg{border-radius:8px;padding:9px 12px;font-size:14px;margin-top:12px}
+.msg.ok{background:var(--field-bg);color:var(--field)} .msg.err{background:var(--brick-bg);color:var(--brick)} .msg.warn{background:var(--amber-bg);color:var(--amber-ink)}
+.msg .btn{margin-left:8px}
+#stray .msg{margin:0 0 16px}
+.rep{margin:10px 0 0;padding:0;list-style:none;font-size:14px}
+.cbox{border-radius:10px;padding:12px 14px;margin-top:12px;border:1px solid var(--line)}
+.cbox .cn{display:flex;flex-wrap:wrap;gap:6px 22px;margin:4px 0 8px}
+.cbox .cn b{font-size:22px;font-variant-numeric:tabular-nums;display:block;line-height:1.1}
+.cbox .cn span{font-size:13px;color:var(--ink-2)}
+.cbox ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--ink-2);max-height:220px;overflow:auto}
+.cl-g{color:var(--field)} .cl-r{color:var(--brick)} .cl-a{color:var(--amber-ink)}
+.rep li{padding:7px 0;border-bottom:1px solid var(--line-2)} .rep li:last-child{border-bottom:0}
+.msg code{font-size:15px;background:var(--card);padding:1px 6px;border-radius:4px}
+.tgroup{margin-top:14px}
+.tgroup h3{font-size:14px;margin:0 0 6px;color:var(--ink-2)}
+/* analysis */
+.find{display:grid;grid-template-columns:10px 1fr;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:8px;font-size:14.5px}
+.find::before{content:"";width:10px;height:10px;border-radius:50%;margin-top:6px}
+.find.good{background:var(--field-bg)} .find.good::before{background:var(--field)}
+.find.warn{background:var(--amber-bg)} .find.warn::before{background:var(--amber)}
+.find.bad{background:var(--brick-bg)} .find.bad::before{background:var(--brick)}
+.find.info{background:var(--slate-bg)} .find.info::before{background:var(--slate)}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.vc{border:1px solid var(--card-line);border-radius:10px;padding:12px 14px;border-left:5px solid var(--ink-3)}
+.vc.good{border-left-color:var(--field)} .vc.warn{border-left-color:var(--amber)} .vc.bad{border-left-color:var(--brick)}
+.vc h3{margin:0;font-size:15px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.vc h3 small{font-weight:400;color:var(--ink-3);font-size:13px}
+.vc h3 .p{margin-left:auto;font-variant-numeric:tabular-nums}
+.vc .cnt{font-size:13px;color:var(--ink-2);margin:6px 0;font-variant-numeric:tabular-nums}
+.vc ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.vc .next{margin-top:8px;font-size:14px;font-weight:600}
+details.acc{border-top:1px solid var(--line-2);padding:8px 0}
+details.acc summary{cursor:pointer;font-weight:600}
+details.acc summary small{font-weight:400;color:var(--ink-3)}
+.rrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-2)}
+.rrow span{flex:1}
+.login{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:20px}
+.login[hidden]{display:none}
+.lbox{width:100%;max-width:360px;background:var(--card);border:1px solid var(--card-line);border-radius:14px;padding:26px 24px;box-shadow:0 4px 24px rgba(20,30,40,.08)}
+.lbox .role{font-size:13px;color:var(--ink-3)}
+.lbox h2{font:600 24px/1.2 "IBM Plex Serif",Georgia,serif;margin:0}
+.lbox p{color:var(--ink-2);margin:2px 0 12px}
+.lbox label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px}
+.lbox input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card);font-size:16px}
+.lbox .btn{width:100%;margin-top:18px;padding:11px}
+.lerr{color:var(--brick);font-size:14px;min-height:1.2em;margin:10px 0 0}
+dialog{border:0;border-radius:12px;padding:0;max-width:820px;width:calc(100% - 24px);max-height:88vh;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(20,26,31,.45)}
+.dlg{padding:18px 20px 22px}
+.dhead{display:flex;align-items:center;gap:12px}
+.dhead h2{font:600 21px/1.2 "IBM Plex Serif",Georgia,serif;margin:0;flex:1}
+.dlg h3{font-size:15px;margin:18px 0 6px}
+.loading{color:var(--ink-3);padding:20px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+.toast.show{opacity:1}
+footer{font-size:13px;color:var(--ink-3);text-align:center;padding:10px 0 30px}
+@media (max-width:640px){h1{font-size:22px}.reasons .r{grid-template-columns:1fr 54px 62px}.reasons .r>span:nth-child(2){display:none}.sp b{font-size:20px}.vcards{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+body.one .tonly{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="t"><h1>Farmer ID by Bucket – Tracking</h1><div class="crumb">Administrator, District <span id="district">Kupwara</span> <span id="asof" class="muted"></span></div></div>
+    <a href="index.html">Public page</a>
+    <button class="btn sec sm" id="refresh">Refresh</button>
+    <button class="btn sec sm" id="logout">Sign out</button>
+  </header>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="dash" aria-selected="true">Dashboard</button>
+    <button class="tab" role="tab" data-tab="vill" aria-selected="false">Villages</button>
+    <button class="tab" role="tab" data-tab="ana" aria-selected="false">Analysis</button>
+    <button class="tab" role="tab" data-tab="rsn" aria-selected="false">Reasons</button>
+    <button class="tab" role="tab" data-tab="clm" aria-selected="false">AgriStack status</button>
+    <button class="tab" role="tab" data-tab="set" aria-selected="false">Settings</button>
+  </div>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="panel" id="p-dash">
+    <div id="stray"></div>
+    <div class="cards" id="dcards"><div class="loading">Loading…</div></div>
+    <div class="card">
+      <div class="prog"><b id="dpct">0%</b><span>of buckets submitted</span><span class="muted" id="dsub"></span></div>
+      <div class="bar" id="dbar"></div>
+      <div class="legend"><span><i style="background:var(--field)"></i>Generated</span><span><i style="background:var(--amber)"></i>Not generated</span><span><i style="background:var(--grey)"></i>Not yet submitted</span></div>
+    </div>
+    <div class="card tonly">
+      <h2>By tehsil <small>tap a tehsil to see only its villages</small></h2>
+      <div class="tw"><table id="ttab"></table></div>
+    </div>
+    <div class="card" id="vcard">
+      <h2>By village <small id="vnote"></small><span class="sp"></span><button class="btn sec sm" id="csv">Download CSV</button></h2>
+      <div class="tools">
+        <input class="in search" id="vq" type="search" placeholder="Search village">
+        <select class="in tonly" id="vt" aria-label="Tehsil"><option value="">All tehsils</option></select>
+      </div>
+      <div class="tw"><table id="vtab"></table></div>
+      <p class="muted" style="font-size:13px;margin:8px 0 0">Tap a village for its reasons and latest entries.</p>
+    </div>
+  </section>
+
+  <!-- ============ VILLAGES ============ -->
+  <section class="panel" id="p-vill" hidden>
+    <p class="lead">Register each village with the Excel made by the generator. Its page on the website must have the file name shown in the list.</p>
+    <div class="card">
+      <h2 id="formTitle">Add a village</h2>
+      <form class="form" id="vform" autocomplete="off">
+        <div class="xl"><label for="f-xl">Village Excel from the generator <span class="muted">(the _sheet.xlsx file)</span></label>
+          <input class="in" type="file" id="f-xl" accept=".xlsx"><div id="xlinfo" class="muted" style="font-size:13px;margin-top:4px">Choosing it fills in the details below and loads every bucket into the Google Sheet.</div></div>
+        <div class="tonly"><label for="f-tehsil">Tehsil</label><select class="in" id="f-tehsil" required><option value="">Choose…</option></select></div>
+        <div><label for="f-village">Village name</label><input class="in" id="f-village" required placeholder="Same as on the village page"></div>
+        <div style="display:flex;gap:8px"><button class="btn" id="fsave" type="submit">Add village</button><button class="btn sec" type="button" id="fcancel" hidden>Cancel</button></div>
+      </form>
+      <div id="fmsg"></div>
+    </div>
+    <div class="card">
+      <h2>Registered villages <small id="vcount"></small></h2>
+      <div id="vlist"></div>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS ============ -->
+  <section class="panel" id="p-ana" hidden>
+    <p class="lead">Where Farmer IDs stand, why they are not generated, and what needs attention. Everything here is worked out from the entries in the Google Sheet.</p>
+    <div class="cards" id="acards"></div>
+    <div class="card"><h2>Key findings</h2><div id="findings"></div></div>
+    <div class="card"><h2>Needs attention</h2><div id="attention"></div></div>
+    <div class="card"><h2>Entries submitted and why Farmer IDs are not generated <small class="tonly">all tehsils</small></h2><div id="areasons"></div><div id="atehsils" class="tonly" style="margin-top:10px"></div></div>
+    <div class="card"><h2>Village-wise conclusions <small id="vcnote"></small></h2>
+      <div class="tools"><select class="in" id="vcsort" aria-label="Order"><option value="attention">Needing attention first</option><option value="pending">Most not yet submitted first</option><option value="notgen">Most not generated first</option><option value="name">By name</option></select></div>
+      <div class="vcards" id="vconc"></div></div>
+  </section>
+
+  <!-- ============ REASONS ============ -->
+  <section class="panel" id="p-rsn" hidden>
+    <p class="lead">These fill the reason drop-down shown on every village page when a Farmer ID is not generated. Changes take effect the next time a page is opened or reloaded. They are kept in the “Reasons” tab of the Google Sheet, which can also be edited directly.</p>
+    <div class="card">
+      <h2>Add a reason</h2>
+      <form class="tools" id="rform" style="margin:0"><input class="in search" id="rtext" maxlength="80" placeholder="Reason text" required><button class="btn" type="submit">Add</button></form>
+      <div id="rmsg"></div>
+    </div>
+    <div class="card"><h2>Current reasons <small id="rcount"></small></h2><div id="rlist"></div></div>
+  </section>
+
+  <!-- ============ AGRISTACK STATUS ============ -->
+  <section class="panel" id="p-clm" hidden>
+    <p class="lead">Upload the “Buckets UnClaimed” report downloaded from AgriStack for a village. Each bucket on that village's page then shows whether AgriStack has it as claimed (green), partly claimed with some plots still unclaimed (amber), or unclaimed (light red). Until a report is uploaded, the page looks as before.</p>
+    <div class="card">
+      <h2>Upload an unclaimed-buckets report</h2>
+      <div class="form" id="cform">
+        <div class="tonly"><label for="c-tehsil">Tehsil</label><select class="in" id="c-tehsil"><option value="">Choose…</option></select></div>
+        <div><label for="c-village">Village</label><select class="in" id="c-village" disabled><option value="">Choose the tehsil first</option></select></div>
+        <div class="xl"><label for="c-xl">AgriStack report <span class="muted">(Buckets_UnClaimed_ReportDetails … .xlsx)</span></label><input class="in" type="file" id="c-xl" accept=".xlsx,.xls" disabled></div>
+      </div>
+      <div id="cprev"></div>
+    </div>
+    <div class="card"><h2>Villages with a report <small id="ccount"></small></h2><div id="clist"></div><div id="markout"></div></div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="panel" id="p-set" hidden>
+    <div class="card">
+      <h2>Edit PIN for village pages</h2>
+      <p style="margin:0 0 8px;color:var(--ink-2)">Anyone can view village pages. The PIN is asked when someone first tries to make or change an entry, and again every time the page is opened afresh; it is not remembered after the page or browser is closed. Current PIN: <b id="curpin">…</b></p>
+      <form class="form" id="pinform" autocomplete="off">
+        <div><label for="newpin">New PIN (4–8 digits)</label><input class="in" id="newpin" inputmode="numeric" pattern="\d{4,8}" required></div>
+        <div><button class="btn" type="submit">Change PIN</button></div>
+      </form>
+      <div id="pinmsg"></div>
+    </div>
+    <div class="card">
+      <h2>Change admin password</h2>
+      <form class="form" id="pform" autocomplete="off">
+        <div><label for="op">Current password</label><input class="in" id="op" type="password" required></div>
+        <div><label for="np">New password</label><input class="in" id="np" type="password" required minlength="8"></div>
+        <div><button class="btn" type="submit">Change password</button></div>
+      </form>
+      <div id="pmsg"></div>
+    </div>
+    <div class="card" id="repcard" hidden>
+      <h2>Check the Google Sheet</h2>
+      <p style="margin:0 0 10px;color:var(--ink-2);max-width:75ch">Use this when entries are in the Google Sheet but do not show on a village page or in the totals here. It finds entries left in a village's earlier tab (for example after its tehsil was changed in the sheet), puts them back, and counts every village again from its own tab, which also picks up anything typed into the sheet by hand. Nothing is deleted. It can take a minute.</p>
+      <button class="btn" id="repair" type="button">Check and restore entries</button>
+      <div id="repmsg"></div>
+    </div>
+    <div class="card">
+      <h2>How it fits together</h2>
+      <p style="margin:0;color:var(--ink-2);max-width:75ch">Each village page is made with the generator and saves into this portal's Google Sheet, one tab per village. Anyone with a village link can view it; entering data needs the edit PIN. Figures here update every time a village saves. <a href="check.html">Run the portal check</a> if a page does not save.</p>
+    </div>
+  </section>
+  <footer>Developed and maintained by Obaid Peerzada</footer>
+</div>
+
+<div class="login" id="login" hidden>
+  <form class="lbox" id="lform">
+    <div class="role">Administrator</div>
+    <h2>Farmer ID by Bucket</h2><p>District Kupwara</p>
+    <label for="lu">Username</label><input id="lu" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+    <button class="btn" id="lbtn" type="submit">Sign in</button>
+    <p class="lerr" id="lerr" role="alert"></p>
+  </form>
+</div>
+<dialog id="dlg"><div class="dlg"><div class="dhead"><h2 id="dtitle"></h2><button class="btn sec sm" id="dclose">Close</button></div><div id="dbody"></div></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const slug=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');   // same rule as the generator
+const fmt=n=>Number(n||0).toLocaleString('en-IN');
+const pct=(a,b)=>b?Math.round(a*1000/b)/10:0;
+const when=s=>s?new Date(s).toLocaleString([],{dateStyle:'medium',timeStyle:'short'}):'';
+const pl=(n,w,ws)=>`${fmt(n)} ${n===1?w:(ws||w+'s')}`;
+const SKEY='farmerIdAdmin';
+let S=null, D=null, sortKey='psub', sortAsc=false, tFilter='', editing=null;
+try{S=JSON.parse(localStorage.getItem(SKEY)||'null')}catch(e){}
+function toast(t){const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),2000);}
+
+/* One call to the Google Sheet. When Google is busy it answers with an error page instead of data
+   ("Unexpected token '<'"). The call is then tried again by itself a few times before anything is shown. */
+async function sheetCall(url,payload,tries=4){
+  let said='', net=false;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      const text=await r.text(); net=false;
+      try{ const j=JSON.parse(text); if(!(j&&j.busy)) return j; said=''; }
+      catch(_){ said=text.replace(/<(script|style)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim().slice(0,90); }
+    }catch(e){ net=true; }
+    if(i<tries-1) await new Promise(res=>setTimeout(res,[1500,3500,7000][i]+Math.random()*1200));
+  }
+  const e=new Error(net?'no connection to the Google Sheet':'the Google Sheet is busy'+(said?' – Google said “'+said+'”':'')); e.busy=true; throw e;
+}
+async function api(action,payload={}){
+  if(!APPS_SCRIPT_URL) throw new Error('The portal link is not set. On GitHub, open config.js and paste the Apps Script /exec link between the quotes.');
+  let j;
+  try{ j=await sheetCall(APPS_SCRIPT_URL,{action,token:S&&S.token,...payload}); }
+  catch(e){ throw new Error(e.message[0].toUpperCase()+e.message.slice(1)+'. Please try again in a moment.'); }
+  if(!j.ok){const e=new Error(j.error||'Request failed'); if(j.auth){S=null; try{localStorage.removeItem(SKEY)}catch(_){} showLogin(j.error);} throw e;}
+  return j;
+}
+function showLogin(m){$('#lerr').textContent=m||''; $('#login').hidden=false; setTimeout(()=>$('#lu').focus(),50);}
+$('#lform').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#lbtn').disabled=true; $('#lerr').textContent='';
+  try{ const j=await api('login',{username:$('#lu').value.trim(),password:$('#lp').value});
+    if(j.role!=='admin') throw new Error('This is not an admin login.');
+    S={token:j.token,username:j.username}; try{localStorage.setItem(SKEY,JSON.stringify(S))}catch(_){}
+    $('#lp').value=''; $('#login').hidden=true; await refresh();
+  }catch(err){$('#lerr').textContent=/Failed to fetch|NetworkError/i.test(err.message)?'The portal link does not answer. Open check.html to see why.':err.message;} finally{$('#lbtn').disabled=false;}
+});
+$('#logout').addEventListener('click',()=>{ const tk=S&&S.token; S=null; try{localStorage.removeItem(SKEY)}catch(_){} if(tk) fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logout',token:tk})}).catch(()=>{}); showLogin(); });
+
+/* ---------------- data ---------------- */
+function sum(list){
+  const s={villages:list.length,loaded:list.filter(v=>v.total>0).length,total:0,generated:0,not_generated:0,farmer_ids:0,groups:0,reasons:{}};
+  list.forEach(v=>{s.total+=v.total; s.generated+=v.generated; s.not_generated+=v.not_generated; s.farmer_ids+=v.farmer_ids; s.groups+=v.groups||0; for(const [k,n] of Object.entries(v.reasons||{})) s.reasons[k]=(s.reasons[k]||0)+n;});
+  s.submitted=s.generated+s.not_generated; s.pending=Math.max(0,s.total-s.submitted); s.psub=pct(s.submitted,s.total); s.pgen=pct(s.generated,s.submitted);
+  return s;
+}
+const topReason=r=>{const e=Object.entries(r||{}).filter(([k])=>k!=='(no reason)').sort((a,b)=>b[1]-a[1]); return e[0]||null;};
+const ONE=()=>!!(D&&D.tehsils&&D.tehsils.length===1);     // Kupwara: one list of villages, no tehsils shown
+async function refresh(){
+  try{ D=await api('adminSummary'); }catch(e){ $('#dcards').innerHTML=`<div class="msg err">${esc(/Failed to fetch/i.test(e.message)?'The portal link does not answer. Open check.html to see why.':e.message)}</div>`; return; }
+  D.villages.forEach(v=>{ v.submitted=v.generated+v.not_generated; v.pending=Math.max(0,v.total-v.submitted); v.psub=pct(v.submitted,v.total); v.pgen=pct(v.generated,v.submitted);
+    v.days=v.last_entry?Math.floor((Date.now()-Date.parse(v.last_entry))/864e5):null; v.noreason=(v.reasons||{})['(no reason)']||0;
+    v.stale=Object.entries(v.reasons||{}).filter(([k])=>k!=='(no reason)'&&!(D.reasons||[]).includes(k)); });
+  $('#district').textContent=D.district;
+  $('#asof').textContent='· updated '+new Date().toLocaleTimeString([],{timeStyle:'short'});
+  const opts=D.tehsils.map(t=>`<option>${esc(t)}</option>`).join('');
+  $('#vt').innerHTML='<option value="">All tehsils</option>'+opts; $('#vt').value=tFilter;
+  const keep=$('#f-tehsil').value; $('#f-tehsil').innerHTML='<option value="">Choose…</option>'+opts; $('#f-tehsil').value=keep;
+  document.body.classList.toggle('one',ONE()); if(ONE()) $('#f-tehsil').value=D.tehsils[0];
+  $('#repcard').hidden=D.stray===undefined; renderStray(); renderDash(); renderClaims(); renderVillages(); renderVillageList(); renderAnalysis(); renderReasonList();
+}
+/* ---------------- AgriStack claimed / unclaimed status ---------------- */
+let CL=null;          // the report being checked: {village, tehsil, label, unclaimed:[bucket ids], ...}
+function renderClaims(){
+  const tehs=D.tehsils.filter(t=>D.villages.some(v=>v.tehsil===t&&v.total));
+  const keep=$('#c-tehsil').value;
+  $('#c-tehsil').innerHTML='<option value="">Choose…</option>'+tehs.map(t=>`<option>${esc(t)}</option>`).join(''); $('#c-tehsil').value=tehs.includes(keep)?keep:'';
+  if(ONE()&&tehs.length) $('#c-tehsil').value=tehs[0];
+  fillClaimVillages();
+  const list=D.villages.filter(v=>v.claim_report).sort((a,b)=>a.tehsil.localeCompare(b.tehsil)||a.village.localeCompare(b.village));
+  $('#ccount').textContent=list.length?`${list.length}`:'';
+  $('#clist').innerHTML=list.length?`<div class="tw"><table><thead><tr><th class="l">Village</th><th class="l tonly">Tehsil</th><th class="l">Report</th><th>Claimed</th><th>Partly claimed</th><th>Unclaimed</th><th class="l"></th></tr></thead><tbody>${list.map(v=>`<tr data-v="${esc(v.village)}" data-t="${esc(v.tehsil)}"><td class="l"><b>${esc(v.village)}</b></td><td class="l tonly">${esc(v.tehsil)}</td><td class="l muted">${esc(v.claim_report)}</td><td class="cl-g">${fmt(Math.max(0,v.total-v.unclaimed-(v.partly||0)))}</td><td class="cl-a">${fmt(v.partly||0)}</td><td class="cl-r">${fmt(v.unclaimed)}</td><td class="l" style="white-space:nowrap"><button class="btn sm" data-act="mark">Mark claimed as Generated</button> <button class="btn sec sm" data-act="clear">Remove</button></td></tr>`).join('')}</tbody></table></div>`
+    :'<p class="muted" style="margin:0">No report uploaded yet. Village pages show the normal view.</p>';
+}
+/* result of "Mark claimed as Generated": what changed and what was left for checking */
+function markText(village,j,done){
+  const ng=j.not_generated||[];
+  return `<div class="cbox"><b>${esc(village)}</b>: ${done?`${fmt(j.marked)} bucket${j.marked===1?'':'s'} marked Generated (recorded as “AgriStack report of ${esc(String(j.report).split(' · ')[0])}”).`:'Nothing to mark: every claimed or partly claimed bucket already has an entry.'}
+    ${j.already?` ${fmt(j.already)} ${j.already===1?'was':'were'} already Generated.`:''}${j.reset_by_team?` ${fmt(j.reset_by_team)} ${j.reset_by_team===1?'was':'were'} cleared by the team on the village page and left blank.`:''}
+    ${ng.length?`<div class="msg warn" style="margin:10px 0 0"><b>To check:</b> AgriStack shows ${ng.length===1?'this bucket':'these '+ng.length+' buckets'} claimed, but the team recorded Not generated. Left as entered.<div class="tw"><table style="margin-top:6px"><thead><tr><th class="l">Bucket</th><th class="l">Owner / parentage</th><th class="l">AgriStack</th><th class="l">Reason given</th><th class="l">By</th></tr></thead><tbody>${ng.map(x=>`<tr><td class="l">${esc(String(x.bucket_id).slice(0,13))}</td><td class="l">${esc(x.owner)} <span class="muted">/ ${esc(x.parentage)}</span></td><td class="l ${x.partly?'cl-a':'cl-g'}">${x.partly?'Partly claimed':'Claimed'}</td><td class="l" style="white-space:normal">${esc(x.reason||'–')}</td><td class="l muted">${esc(x.by||'')}</td></tr>`).join('')}</tbody></table></div></div>`:''}</div>`;
+}
+function fillClaimVillages(){
+  const t=$('#c-tehsil').value, keep=$('#c-village').value;
+  const vs=D.villages.filter(v=>v.tehsil===t&&v.total).sort((a,b)=>a.village.localeCompare(b.village));
+  $('#c-village').innerHTML=t?'<option value="">Choose…</option>'+vs.map(v=>`<option value="${esc(v.village)}">${esc(v.village)}${v.claim_report?' – report uploaded':''}</option>`).join(''):'<option value="">Choose the tehsil first</option>';
+  $('#c-village').disabled=!t; $('#c-village').value=vs.some(v=>v.village===keep)?keep:'';
+  $('#c-xl').disabled=!$('#c-village').value;
+}
+$('#c-tehsil').addEventListener('change',()=>{ fillClaimVillages(); $('#cprev').innerHTML=''; $('#c-xl').value=''; CL=null; });
+$('#c-village').addEventListener('change',()=>{ $('#c-xl').disabled=!$('#c-village').value; $('#cprev').innerHTML=''; $('#c-xl').value=''; CL=null; });
+/* names as AgriStack writes them in different files: Mohd = Mohammad, Gh = Ghulam, Mst/Masmat dropped, letters only */
+const nmz=s=>String(s??'').toLowerCase().replace(/\b(mohd|mohamad|mohammed|muhammad|mohmad|mohamamd|mohd\.)\b/g,'mohammad').replace(/\b(gh|gulam|golam)\b/g,'ghulam')
+  .replace(/\b(mst|msmt|masmat|musammat|musamat|musamati|musmati|smt|begum|bibi|late|marhoom)\b/g,' ').replace(/[^a-z]/g,'').replace(/q/g,'k').replace(/(.)\1+/g,'$1');
+const noPar=s=>/^(|na|nil|none|-+)$/i.test(String(s??'').trim().replace(/\./g,''));
+function reportDate(f){ const m=f.name.match(/1[6-9]\d{11}/); const d=m?new Date(+m[0]):new Date(f.lastModified||Date.now()); return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
+$('#c-xl').addEventListener('change',async()=>{
+  const f=$('#c-xl').files[0]; CL=null; if(!f) return;
+  const village=$('#c-village').value, tehsil=$('#c-tehsil').value;
+  $('#cprev').innerHTML='<div class="loading">Reading the report and this village’s buckets…</div>';
+  try{
+    if(typeof XLSX==='undefined') throw new Error('The Excel reader could not load. Check the internet connection and reload.');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}); let rows=null, H=null;
+    for(const n of wb.SheetNames){ const a=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});
+      const h=a.findIndex(r=>r.map(x=>String(x).trim().toLowerCase()).includes('bucket id')&&r.map(x=>String(x).trim().toLowerCase()).includes('survey number'));
+      if(h>=0){ H=a[h].map(x=>String(x).trim().toLowerCase()); rows=a.slice(h+1).filter(r=>String(r[H.indexOf('bucket id')]).trim()); break; } }
+    if(!rows) throw new Error('This is not the AgriStack unclaimed-buckets report: no “Bucket ID” and “Survey Number” columns were found.');
+    const col=n=>H.indexOf(n), ci={id:col('bucket id'),code:col('village lgd code'),vn:col('village name'),sv:col('survey number'),nm:col('farmer name'),par:col('identifier name')};
+    const R=rows.map(r=>({id:String(r[ci.id]).trim(),vn:ci.vn>=0?String(r[ci.vn]).trim():'',code:ci.code>=0?String(r[ci.code]).trim():'',sv:String(r[ci.sv]).trim(),nm:ci.nm>=0?r[ci.nm]:'',par:ci.par>=0?r[ci.par]:''}));
+    const j=await api('adminClaimBuckets',{tehsil,village}), B=j.buckets;
+    const rIds=new Set(R.map(r=>r.id)), sIds=new Set(B.map(b=>b[0]));
+    const byId=[...rIds].filter(x=>sIds.has(x)).length;
+    const left=new Map(), lost=new Map();        // left: bucket -> plots still unclaimed; lost: report buckets that fit no bucket of this village
+    const plotsOf=new Map(B.map(b=>[b[0],+b[5]||0]));
+    let how;
+    if(byId>=rIds.size*0.5){                     // the village's buckets carry AgriStack's own Bucket IDs
+      how='by AgriStack Bucket ID';
+      R.forEach(r=>{ if(sIds.has(r.id)) left.set(r.id,(left.get(r.id)||0)+1); else lost.set(r.id,r); });
+    }else{                                       // the buckets were made from the AgriStack file: same survey number and same person
+      how='by survey number and name (this village’s buckets were made from the AgriStack file)';
+      const idx=new Map();                       // survey number -> [bucket, person variants]
+      B.forEach(b=>{ const vars=[[b[1],b[2]]].concat(String(b[3]||'').split(' | ').filter(Boolean).map(x=>x.split(' / ')));
+        String(b[4]).split(',').map(x=>x.trim()).filter(Boolean).forEach(sv=>{ if(!idx.has(sv)) idx.set(sv,[]); idx.get(sv).push([b[0],vars]); }); });
+      const found=new Set();
+      R.forEach(r=>{ const n=nmz(r.nm), p=nmz(r.par), np=noPar(r.par);
+        (idx.get(r.sv)||[]).forEach(([id,vars])=>{ if(vars.some(([vn,vp])=>nmz(vn)===n&&(nmz(vp)===p||np||noPar(vp)))){ left.set(id,(left.get(id)||0)+1); found.add(r.id); } }); });
+      R.forEach(r=>{ if(!found.has(r.id)&&!lost.has(r.id)) lost.set(r.id,r); });
+    }
+    const vnames=[...new Set(R.map(r=>r.vn).filter(Boolean))], k=x=>String(x).toLowerCase().replace(/[^a-z]/g,'');
+    const wrongVillage=vnames.length&&!vnames.some(n=>k(n)===k(village));
+    const marks={}; let nU=0, nP=0;
+    left.forEach((n,id)=>{ const all=plotsOf.get(id)||0; marks[id]=[n,all]; if(all&&n<all) nP++; else nU++; });
+    CL={tehsil,village,label:`${reportDate(f)} · ${f.name}`.slice(0,120),marks};
+    $('#cprev').innerHTML=`<div class="cbox">
+      ${wrongVillage?`<div class="msg err" style="margin:0 0 10px">This report is for <b>${esc(vnames.join(', '))}</b>${R[0].code?' (LGD '+esc(R[0].code)+')':''}, not ${esc(village)}. Check that the right file and village are chosen.</div>`:''}
+      <div class="muted" style="font-size:13px">Report of ${esc(reportDate(f))}: ${fmt(R.length)} rows, ${fmt(rIds.size)} unclaimed buckets in AgriStack${vnames.length?' for '+esc(vnames.join(', ')):''}. Matched ${how}.</div>
+      <div class="cn"><div><b>${fmt(B.length)}</b><span>buckets of ${esc(village)}</span></div><div class="cl-g"><b>${fmt(B.length-nU-nP)}</b><span>claimed</span></div><div class="cl-a"><b>${fmt(nP)}</b><span>partly claimed<br>(some plots still unclaimed)</span></div><div class="cl-r"><b>${fmt(nU)}</b><span>unclaimed</span></div></div>
+      ${nP?`<p class="muted" style="font-size:13px;margin:0 0 8px">Buckets with a Farmer ID: ${fmt(B.length-nU)} (${fmt(B.length-nU-nP)} fully + ${fmt(nP)} partly claimed).</p>`:''}
+      ${lost.size?`<div class="msg warn" style="margin:0">${fmt(lost.size)} unclaimed bucket${lost.size===1?'':'s'} in the report could not be found among this village’s buckets:<ul>${[...lost.values()].slice(0,40).map(r=>`<li>${esc(r.nm)} / ${esc(r.par)} – survey ${esc(r.sv)}</li>`).join('')}${lost.size>40?`<li>and ${lost.size-40} more</li>`:''}</ul></div>`:'<div class="msg ok" style="margin:0">Every unclaimed bucket in the report was found in this village.</div>'}
+      <div class="btns" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">${wrongVillage?`<label style="font-size:14px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="cforce"> Use it anyway</label>`:''}<button class="btn" id="csave" type="button" ${wrongVillage?'disabled':''}>Show on the ${esc(village)} page</button></div>
+    </div>`;
+  }catch(e){ $('#cprev').innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+});
+document.addEventListener('change',e=>{ if(e.target.id==='cforce') $('#csave').disabled=!e.target.checked; });
+document.addEventListener('click',async e=>{
+  if(e.target.id==='csave'&&CL){ const b=e.target; b.disabled=true; b.textContent='Saving…';
+    try{ const j=await api('adminSaveClaims',CL); $('#cprev').innerHTML=`<div class="msg ok">${esc(CL.village)}: ${fmt(j.claimed)} claimed, ${fmt(j.partly||0)} partly claimed and ${fmt(j.unclaimed)} unclaimed buckets saved. The village page shows them from the next time it is opened. To record the claimed ones as Generated, use “Mark claimed as Generated” in the list below.</div>`; $('#c-xl').value=''; CL=null; await refresh(); }
+    catch(err){ b.disabled=false; b.textContent='Try again'; toast(err.message); } }
+  const mk=e.target.closest('#clist button[data-act=mark]');
+  if(mk){ const tr=mk.closest('tr'), who={tehsil:tr.dataset.t,village:tr.dataset.v}; mk.disabled=true;
+    try{
+      const d=await api('adminMarkClaimed',{...who,dry:true});
+      const skip=[d.already?`${fmt(d.already)} already Generated`:'',d.not_generated.length?`${fmt(d.not_generated.length)} recorded as Not generated by the team`:'',d.reset_by_team?`${fmt(d.reset_by_team)} cleared by the team on the page`:''].filter(Boolean).join(', ');
+      if(!d.marked){ $('#markout').innerHTML=markText(who.village,d,false); mk.disabled=false; return; }
+      if(!confirm(`${who.village}: mark ${d.marked} claimed or partly claimed bucket${d.marked===1?'':'s'} as Generated?\n\nOnly buckets with no entry are changed${skip?' ('+skip+' are left as they are)':''}. Unclaimed buckets are not touched.`)){ mk.disabled=false; return; }
+      const j=await api('adminMarkClaimed',who); await refresh(); $('#markout').innerHTML=markText(who.village,j,true); toast(`${j.marked} buckets marked Generated`);
+    }catch(err){ toast(err.message); mk.disabled=false; } }
+  const rm=e.target.closest('#clist button[data-act=clear]');
+  if(rm){ const tr=rm.closest('tr'); if(!confirm(`Remove the AgriStack status from ${tr.dataset.v}? Its page goes back to the normal view.`)) return;
+    try{ await api('adminClearClaims',{tehsil:tr.dataset.t,village:tr.dataset.v}); toast('Removed'); await refresh(); }catch(err){ toast(err.message); } }
+});
+
+/* ---------------- entries left in an earlier tab of the Google Sheet ---------------- */
+function renderStray(){
+  const st=D.stray||[], names=[...new Set(st.map(x=>x.village))];
+  $('#stray').innerHTML=names.length?`<div class="msg warn"><b>Entries of ${names.length===1?'one village':names.length+' villages'} are in the Google Sheet but not showing here</b> (${names.slice(0,8).map(esc).join(', ')}${names.length>8?' and '+(names.length-8)+' more':''}). They are sitting in an earlier tab of the village, usually because its tehsil was changed in the sheet. <button class="btn sm" id="strayfix" type="button">Restore them</button></div>`:'';
+}
+function repairText(j){
+  const r=j.report||[];
+  if(!r.length) return `<div class="msg ok">Everything in the Google Sheet is already showing. ${fmt(j.checked)} village${j.checked===1?'':'s'} checked.</div>`;
+  return `<div class="msg ok">${fmt(j.checked)} village${j.checked===1?'':'s'} checked; ${r.length} put right.</div><ul class="rep">${r.map(x=>`<li><b>${esc(x.village)}</b> <span class="muted">${esc(x.tehsil)}</span>: entries showing went from ${fmt(x.before)} to ${fmt(x.after)}${x.from&&x.from.length?`; brought in from ${x.from.map(f=>'“'+esc(f)+'”').join(', ')}`:'; counted again from its tab'}</li>`).join('')}</ul>`;
+}
+async function repair(only,btn,out){
+  const label=btn.textContent; btn.disabled=true; btn.textContent='Checking the Google Sheet…';
+  try{ const j=await api('adminRepair',only?{only}:{}); await refresh(); out.innerHTML=repairText(j); toast('Google Sheet checked'); }
+  catch(e){ out.innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+  if(btn.isConnected){ btn.disabled=false; btn.textContent=label; }
+}
+document.addEventListener('click',e=>{
+  if(e.target.id==='strayfix'){ const box=$('#stray'), only=[...new Set((D.stray||[]).map(x=>x.village))], out=document.createElement('div'); box.after(out); out.id='strayout'; const old=document.querySelectorAll('#strayout'); if(old.length>1) old[1].remove(); repair(only,e.target,out); }
+  if(e.target.id==='repair') repair(null,e.target,$('#repmsg'));
+});
+const bar=(s,cls='')=>`<span class="bar ${cls}" role="img" aria-label="${s.psub}% submitted"><i style="width:${s.total?s.generated*100/s.total:0}%;background:var(--field)"></i><i style="width:${s.total?s.not_generated*100/s.total:0}%;background:var(--amber)"></i></span>`;
+
+/* ---------------- dashboard ---------------- */
+function renderDash(){
+  const d=sum(D.villages);
+  $('#dcards').innerHTML=`
+    <div class="sc"><b>${fmt(d.villages)}</b><span>${d.villages===1?'village':'villages'}</span><small>${d.loaded} with buckets loaded</small></div>
+    <div class="sc"><b>${fmt(d.total)}</b><span>total buckets</span></div>
+    <div class="sc g"><b>${fmt(d.generated)}</b><span>generated</span><small>${pct(d.generated,d.total)}% of all buckets</small></div>
+    <div class="sc a"><b>${fmt(d.not_generated)}</b><span>not generated</span><small>${pct(d.not_generated,d.total)}% of all buckets</small></div>
+    <div class="sc r"><b>${fmt(d.pending)}</b><span>not yet submitted</span><small>${pct(d.pending,d.total)}% of all buckets</small></div>
+    <div class="sc i"><b>${fmt(d.farmer_ids)}</b><span>Farmer IDs</span><small>${d.generated>d.farmer_ids?`${fmt(d.generated-d.farmer_ids)} fewer than buckets generated`:'one per generated bucket'}</small></div>`;
+  $('#dpct').textContent=d.psub+'%'; $('#dsub').textContent=d.total?`${fmt(d.submitted)} of ${fmt(d.total)}`:'';
+  $('#dbar').innerHTML=`<i style="width:${d.total?d.generated*100/d.total:0}%;background:var(--field)"></i><i style="width:${d.total?d.not_generated*100/d.total:0}%;background:var(--amber)"></i>`;
+  const rows=D.tehsils.map(t=>({t,...sum(D.villages.filter(v=>v.tehsil===t))})).filter(r=>r.villages);
+  const head=`<thead><tr><th class="l">Tehsil</th><th>Villages</th><th>Buckets</th><th>Submitted</th><th>Generated</th><th>Not generated</th><th>Not yet submitted</th><th>Farmer IDs</th></tr></thead>`;
+  const line=(r,label,cls='',dt='')=>`<tr class="${cls}" ${dt?`data-t="${esc(dt)}"`:''}><td class="l"><b>${esc(label)}</b></td><td>${r.villages}</td><td>${fmt(r.total)}</td><td><span class="pc">${r.psub}% ${bar(r,'s')}</span></td><td class="g">${fmt(r.generated)}</td><td class="a">${fmt(r.not_generated)}</td><td class="muted">${fmt(r.pending)}</td><td class="i">${fmt(r.farmer_ids)}</td></tr>`;
+  $('#ttab').innerHTML=head+'<tbody>'+(rows.length?rows.map(r=>line(r,r.t,'click',r.t)).join('')+line(d,'District total','tot'):`<tr><td class="l muted" colspan="8">No villages registered yet. Add them under “Villages”.</td></tr>`)+'</tbody>';
+}
+const VCOLS=[['village','Village','l'],['tehsil','Tehsil','l'],['total','Buckets'],['psub','Submitted'],['generated','Generated'],['not_generated','Not generated'],['pending','Not yet submitted'],['farmer_ids','Farmer IDs'],['last_entry','Last entry']];
+function villageRows(){
+  const q=$('#vq').value.trim().toLowerCase();
+  const list=D.villages.filter(v=>(!tFilter||v.tehsil===tFilter)&&(!q||v.village.toLowerCase().includes(q)));
+  list.sort((a,b)=>{const x=a[sortKey],y=b[sortKey]; const c=typeof x==='string'?String(x).localeCompare(String(y)):(x-y); return sortAsc?c:-c;});
+  return list;
+}
+function renderVillages(){
+  if(!D) return;
+  const list=villageRows();
+  $('#vnote').textContent=`${pl(list.length,'village')}${tFilter?' in '+tFilter:''}`;
+  const cols=VCOLS.filter(c=>!(ONE()&&c[0]==='tehsil'));
+  const head='<thead><tr>'+cols.map(([k,l,c])=>`<th class="s ${c||''}" data-k="${k}" ${sortKey===k?`aria-sort="${sortAsc?'ascending':'descending'}"`:''}>${l}</th>`).join('')+'</tr></thead>';
+  const body=list.map(v=>`<tr class="click" data-v="${esc(v.village)}" data-vt="${esc(v.tehsil)}">
+    <td class="l"><b>${esc(v.village)}</b>${!v.active?'<span class="pill off">closed</span>':''}${!v.total?'<span class="pill new">buckets not loaded</span>':''}</td>
+    ${ONE()?'':`<td class="l">${esc(v.tehsil)}</td>`}<td>${fmt(v.total)}</td><td><span class="pc">${v.psub}% ${bar(v,'s')}</span></td>
+    <td class="g">${fmt(v.generated)}</td><td class="a">${fmt(v.not_generated)}</td><td class="muted">${fmt(v.pending)}</td><td class="i">${fmt(v.farmer_ids)}</td>
+    <td class="muted">${v.last_entry?when(v.last_entry):'–'}</td></tr>`).join('');
+  $('#vtab').innerHTML=head+'<tbody>'+(body||`<tr><td class="l muted" colspan="9">No villages match.</td></tr>`)+'</tbody>';
+}
+$('#vtab').addEventListener('click',e=>{
+  const th=e.target.closest('th.s'); if(th){ const k=th.dataset.k; if(sortKey===k) sortAsc=!sortAsc; else {sortKey=k; sortAsc=['village','tehsil'].includes(k);} renderVillages(); return; }
+  const tr=e.target.closest('tr[data-v]'); if(tr) openVillage(tr.dataset.vt,tr.dataset.v);
+});
+$('#ttab').addEventListener('click',e=>{const tr=e.target.closest('tr[data-t]'); if(!tr) return; tFilter=tr.dataset.t; $('#vt').value=tFilter; renderVillages(); $('#vcard').scrollIntoView({behavior:'smooth'});});
+$('#vt').addEventListener('change',e=>{tFilter=e.target.value; renderVillages();});
+$('#vq').addEventListener('input',renderVillages);
+$('#refresh').addEventListener('click',()=>{ refresh().then(()=>toast('Updated')); });
+$('#csv').addEventListener('click',()=>{
+  if(!D) return; const list=villageRows();
+  const cols=[['tehsil','Tehsil'],['village','Village'],['total','Total buckets'],['submitted','Submitted'],['psub','% submitted'],['generated','Generated'],['not_generated','Not generated'],['pending','Not yet submitted'],['farmer_ids','Farmer IDs'],['last_entry','Last entry']];
+  if(ONE()) cols.shift();
+  const csv=[cols.map(c=>c[1]).join(',')].concat(list.map(v=>cols.map(([k])=>`"${String(k==='last_entry'?when(v[k]):v[k]).replace(/"/g,'""')}"`).join(','))).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'})); a.download=`kupwara_farmer_id_villages_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+});
+/* Percentages of the parts of a whole, to one decimal, made to add up to exactly 100. */
+function shares(counts){
+  const total=counts.reduce((a,c)=>a+c,0); if(!total) return counts.map(()=>0);
+  const raw=counts.map(c=>c*1000/total), out=raw.map(Math.floor); let left=1000-out.reduce((a,c)=>a+c,0);
+  raw.map((x,i)=>[x-out[i],i]).sort((a,c)=>c[0]-a[0]).forEach(([,i])=>{ if(left>0){ out[i]++; left--; } });
+  return out.map(x=>x/10);
+}
+/* Entries submitted = generated + not generated, then the not generated ones split by reason (adds up to 100%). */
+function reasonBlock(s){
+  const sub=s.generated+s.not_generated, [pg,pn]=shares([s.generated,s.not_generated]);
+  const ent=Object.entries(s.reasons||{}).sort((a,b)=>b[1]-a[1]), listed=ent.reduce((a,[,n])=>a+n,0);
+  if(s.not_generated>listed) ent.push(['(no reason)',s.not_generated-listed]);
+  const ps=shares(ent.map(e=>e[1])), tot=ent.reduce((a,[,n])=>a+n,0);
+  const head=`<div class="split">
+      <div class="sp"><b>${fmt(sub)}</b><span>entries submitted</span></div>
+      <div class="sp g"><b>${fmt(s.generated)}</b><span>Generated</span><small>${sub?pg+'% of submitted':''}</small></div>
+      <div class="sp a"><b>${fmt(s.not_generated)}</b><span>Not generated</span><small>${sub?pn+'% of submitted':''}</small></div>
+    </div>
+    <span class="bar" role="img" aria-label="${pg}% generated, ${pn}% not generated"><i style="width:${sub?s.generated*100/sub:0}%;background:var(--field)"></i><i style="width:${sub?s.not_generated*100/sub:0}%;background:var(--amber)"></i></span>`;
+  if(!ent.length) return head+'<p class="muted" style="margin:12px 0 0">No bucket recorded as not generated yet.</p>';
+  return head+`<h3 class="rt">The ${fmt(tot)} not generated, by reason</h3>
+    <div class="reasons"><div class="r rh"><span>Reason</span><span></span><span class="rn">Entries</span><span class="rn">% of not generated</span></div>
+    ${ent.map(([k,n],i)=>`<div class="r"><span>${k==='(no reason)'?'No reason given':esc(k)}${k!=='(no reason)'&&D.reasons&&!D.reasons.includes(k)?' <span class="pill new">no longer on the list</span>':''}</span><span class="rb"><i style="width:${ps[i]}%"></i></span><span class="rn">${fmt(n)}</span><span class="rn"><b>${ps[i]}%</b></span></div>`).join('')}
+    <div class="r rtot"><span>Total not generated</span><span></span><span class="rn">${fmt(tot)}</span><span class="rn">100%</span></div></div>`;
+}
+
+/* ---------------- village detail ---------------- */
+async function openVillage(tehsil,village){
+  const v=D.villages.find(x=>x.village===village&&x.tehsil===tehsil); if(!v) return;
+  $('#dtitle').textContent=ONE()?village:`${village}, ${tehsil}`;
+  $('#dbody').innerHTML=`<div class="prog" style="margin-top:12px"><b>${v.psub}%</b><span>submitted</span><span class="muted">${fmt(v.submitted)} of ${fmt(v.total)}</span></div>${bar(v)}
+    <div class="legend"><span><i style="background:var(--field)"></i>Generated ${fmt(v.generated)}</span><span><i style="background:var(--amber)"></i>Not generated ${fmt(v.not_generated)}</span><span><i style="background:var(--grey)"></i>Not yet submitted ${fmt(v.pending)}</span><span>Farmer IDs ${fmt(v.farmer_ids)}</span></div>
+    <p class="muted" style="font-size:13px">${v.groups?pl(v.groups,'same-person group')+' to check. ':''}${v.last_entry?'Last entry '+when(v.last_entry)+'.':'No entries yet.'} <a href="${slug(v.village)}.html" target="_blank" rel="noopener">Open the village page</a></p>
+    <h3>Entries and reasons</h3>${reasonBlock(v)}
+    <h3>Latest entries</h3><div id="recent" class="loading">Loading…</div>`;
+  $('#dlg').showModal();
+  try{ const j=await api('adminVillageDetail',{tehsil,village});
+    $('#recent').className='tw';
+    $('#recent').innerHTML=j.recent.length?`<table><thead><tr><th class="l">Bucket</th><th class="l">Owner</th><th class="l">Status</th><th class="l">Reason / basis</th><th class="l">By</th><th class="l">Saved</th></tr></thead><tbody>${j.recent.map(r=>`<tr><td class="l">${esc(String(r.bucket_id).slice(0,13))}</td><td class="l">${esc(r.owner)}<br><span class="muted">${esc(r.parentage)}</span></td><td class="l ${r.status==='Generated'?'g':'a'}">${esc(r.status)}</td><td class="l" style="white-space:normal">${esc(r.reason||r.basis)}</td><td class="l">${esc(r.by)}</td><td class="l muted">${r.at?new Date(r.at).toLocaleString([],{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):''}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No entries yet.</p>';
+  }catch(e){ $('#recent').innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+}
+$('#dclose').addEventListener('click',()=>$('#dlg').close());
+$('#dlg').addEventListener('click',e=>{if(e.target.id==='dlg') $('#dlg').close();});
+
+/* ---------------- analysis ---------------- */
+const names=(list,max=8)=>list.slice(0,max).map(v=>esc(v.village)).join(', ')+(list.length>max?` and ${list.length-max} more`:'');
+function villageConclusion(v){
+  const out=[], top=topReason(v.reasons); let tone='warn', next='';
+  if(!v.total){ return {tone:'bad',lines:['No buckets are loaded for this village, so nothing can be entered.'],next:'Load its _sheet.xlsx under Villages → Edit.'}; }
+  if(!v.submitted){ out.push(`Not started: none of the ${fmt(v.total)} buckets has an entry.`); if(v.groups) out.push(`${pl(v.groups,'same-person group')} to check while generating IDs.`);
+    return {tone:'bad',lines:out,next:v.active?'Share the village link and the PIN, and ask for entries to begin.':'The village is closed. Open it under Villages so entries can be made.'}; }
+  out.push(`${fmt(v.submitted)} of ${fmt(v.total)} buckets have an entry (${v.psub}%); ${fmt(v.pending)} remain.`);
+  out.push(`${fmt(v.generated)} generated (${v.pgen}% of those checked) and ${fmt(v.not_generated)} not generated.`);
+  if(v.generated>v.farmer_ids) out.push(`${pl(v.farmer_ids,'Farmer ID')} cover${v.farmer_ids===1?'s':''} the ${fmt(v.generated)} generated buckets, because some buckets belong to the same person.`);
+  if(top) out.push(`Main reason for not generating: “${esc(top[0])}” (${fmt(top[1])} of ${fmt(v.not_generated)}).`);
+  if(v.groups) out.push(`${pl(v.groups,'same-person group')} flagged for checking.`);
+  if(v.noreason) out.push(`${pl(v.noreason,'not-generated entry','not-generated entries')} ${v.noreason===1?'has':'have'} no reason.`);
+  if(v.stale.length) out.push(`${pl(v.stale.reduce((a,x)=>a+x[1],0),'entry','entries')} use a reason that is no longer on the list.`);
+  const stalled=v.pending>0&&v.days!==null&&v.days>7;
+  if(stalled) out.push(`No entry for ${v.days} days.`);
+  if(v.noreason) next='Fill in the missing reasons.';
+  else if(!v.pending){ tone=v.not_generated?'warn':'good'; next=v.not_generated?`All buckets are entered. Follow up the ${fmt(v.not_generated)} not generated${top?', mainly “'+esc(top[0])+'”':''}.`:'Complete. Nothing further.'; }
+  else if(stalled){ tone='bad'; next=`Follow up with the village: ${fmt(v.pending)} buckets remain and entries have stopped.`; }
+  else { tone=v.psub>=75?'good':'warn'; next=`Continue entries: ${fmt(v.pending)} buckets remain.`; }
+  if(v.noreason||v.stale.length) tone=tone==='good'?'warn':tone;
+  return {tone,lines:out,next};
+}
+function renderAnalysis(){
+  if(!D) return;
+  const V=D.villages, d=sum(V), top=topReason(d.reasons);
+  const noreason=V.reduce((a,v)=>a+v.noreason,0), stale=V.reduce((a,v)=>a+v.stale.reduce((x,y)=>x+y[1],0),0);
+  const notStarted=V.filter(v=>v.total&&!v.submitted), unloaded=V.filter(v=>!v.total);
+  const stalled=V.filter(v=>v.submitted&&v.pending&&v.days!==null&&v.days>7), complete=V.filter(v=>v.total&&!v.pending);
+  $('#acards').innerHTML=`
+    <div class="sc a"><b>${fmt(d.not_generated)}</b><span>not generated</span><small>${d.submitted?pct(d.not_generated,d.submitted)+'% of buckets checked':'no entries yet'}</small></div>
+    <div class="sc"><b>${Object.keys(d.reasons).filter(k=>k!=='(no reason)').length}</b><span>reasons in use</span><small>of ${(D.reasons||[]).length} on the list</small></div>
+    <div class="sc ${noreason+stale?'b':'g'}"><b>${fmt(noreason+stale)}</b><span>entries to clean up</span><small>${fmt(noreason)} without a reason, ${fmt(stale)} with a removed reason</small></div>
+    <div class="sc ${notStarted.length?'b':'g'}"><b>${notStarted.length}</b><span>${notStarted.length===1?'village':'villages'} not started</span><small>${stalled.length} stalled, ${complete.length} complete</small></div>`;
+  /* key findings */
+  const F=[];
+  if(!d.total) F.push(['bad','No buckets are loaded yet. Add villages with their Excel files under “Villages”.']);
+  else{
+    F.push([d.psub>=75?'good':d.psub>=30?'warn':'bad',`<b>${d.psub}% of buckets have an entry</b>: ${fmt(d.submitted)} of ${fmt(d.total)} across ${pl(d.loaded,'village')}. ${fmt(d.generated)} generated, ${fmt(d.not_generated)} not generated, and ${fmt(d.pending)} still to be entered.`]);
+    if(d.submitted) F.push([d.pgen>=70?'good':d.pgen>=40?'warn':'bad',`Of the buckets checked so far, <b>${d.pgen}% have a Farmer ID generated</b> (${fmt(d.generated)} of ${fmt(d.submitted)}).`]);
+    if(d.generated) F.push(['info',`<b>${pl(d.farmer_ids,'Farmer ID')}</b> cover${d.farmer_ids===1?'s':''} the ${fmt(d.generated)} generated buckets${d.generated>d.farmer_ids?`; ${fmt(d.generated-d.farmer_ids)} buckets share an ID with another bucket of the same person`:''}.`]);
+    if(top){ const ent=Object.entries(d.reasons).filter(([k])=>k!=='(no reason)').sort((a,b)=>b[1]-a[1]); const t3=ent.slice(0,3).reduce((a,x)=>a+x[1],0);
+      F.push(['warn',`The main reason IDs are not generated is <b>“${esc(top[0])}”</b>: ${fmt(top[1])} of ${fmt(d.not_generated)} (${pct(top[1],d.not_generated)}%).${ent.length>1?` The top ${Math.min(3,ent.length)} reasons account for ${pct(t3,d.not_generated)}%.`:''}`]); }
+    const T=D.tehsils.map(t=>({t,...sum(V.filter(v=>v.tehsil===t))})).filter(r=>r.total);
+    if(T.length>1){ const s=[...T].sort((a,b)=>b.psub-a.psub), lead=s[0], lag=s[s.length-1];
+      F.push([lead.psub-lag.psub>=25?'warn':'good',`Among tehsils, <b>${esc(lead.t)} leads at ${lead.psub}% submitted</b> and ${esc(lag.t)} is lowest at ${lag.psub}%.`]);
+      const diff=T.filter(r=>{const tr=topReason(r.reasons); return top&&tr&&tr[0]!==top[0];});
+      if(diff.length) F.push(['info',`The main reason differs in ${diff.map(r=>`${esc(r.t)} (“${esc(topReason(r.reasons)[0])}”)`).join(', ')}.`]); }
+    if(notStarted.length) F.push(['bad',`<b>${pl(notStarted.length,'village has','villages have')} not started</b>: ${names(notStarted)}.`]);
+    if(stalled.length) F.push(['warn',`<b>${pl(stalled.length,'village is','villages are')} stalled</b> (no entry for more than 7 days with buckets remaining): ${names(stalled)}.`]);
+    if(complete.length) F.push(['good',`<b>${pl(complete.length,'village has','villages have')} every bucket entered</b>: ${names(complete)}.`]);
+    if(noreason+stale+unloaded.length) F.push(['warn',`Data to clean: ${[noreason?pl(noreason,'not-generated entry','not-generated entries')+' without a reason':'',stale?pl(stale,'entry','entries')+' with a reason no longer on the list':'',unloaded.length?pl(unloaded.length,'village')+' with no buckets loaded':''].filter(Boolean).join('; ')}.`]);
+    if(d.groups) F.push(['info',`${pl(d.groups,'same-person group')} across the villages are flagged on the village pages, to check whether one Farmer ID should cover several buckets.`]);
+  }
+  $('#findings').innerHTML=F.map(([t,h])=>`<div class="find ${t}"><div>${h}</div></div>`).join('');
+  /* needs attention */
+  const A=[];
+  V.filter(v=>v.noreason).forEach(v=>A.push(`<b>${esc(v.village)}</b>: ${pl(v.noreason,'not-generated entry','not-generated entries')} without a reason. Open the village page, filter “Not generated, no reason”, and choose the reasons.`));
+  V.filter(v=>v.stale.length).forEach(v=>A.push(`<b>${esc(v.village)}</b>: ${v.stale.map(([k,n])=>`${fmt(n)} × “${esc(k)}”`).join(', ')} – this reason is no longer on the list. Choose a current reason on the village page, or add it back under Reasons.`));
+  unloaded.forEach(v=>A.push(`<b>${esc(v.village)}</b>: no buckets loaded. Use Villages → Edit and choose its _sheet.xlsx.`));
+  V.filter(v=>!v.active&&v.pending).forEach(v=>A.push(`<b>${esc(v.village)}</b> is closed with ${fmt(v.pending)} buckets not yet submitted. Open it under Villages if entries should continue.`));
+  $('#attention').innerHTML=A.length?A.map(h=>`<div class="find warn"><div>${h}</div></div>`).join(''):'<div class="find good"><div>Nothing needs cleaning up.</div></div>';
+  /* reasons */
+  $('#areasons').innerHTML=reasonBlock(d);
+  $('#atehsils').innerHTML=D.tehsils.map(t=>({t,...sum(V.filter(v=>v.tehsil===t))})).filter(r=>r.villages).map(r=>`<details class="acc"><summary>${esc(r.t)} <small>${fmt(r.not_generated)} not generated of ${fmt(r.submitted)} checked, ${pl(r.villages,'village')}</small></summary><div style="margin-top:10px">${reasonBlock(r)}</div></details>`).join('');
+  renderConclusions();
+}
+function renderConclusions(){
+  const mode=$('#vcsort').value, rank={bad:0,warn:1,good:2};
+  const list=D.villages.map(v=>({v,c:villageConclusion(v)}));
+  list.sort((x,y)=>mode==='name'?x.v.village.localeCompare(y.v.village):mode==='pending'?y.v.pending-x.v.pending:mode==='notgen'?y.v.not_generated-x.v.not_generated:(rank[x.c.tone]-rank[y.c.tone])||(y.v.pending-x.v.pending));
+  $('#vcnote').textContent=pl(list.length,'village');
+  $('#vconc').innerHTML=list.map(({v,c})=>`<div class="vc ${c.tone}"><h3>${esc(v.village)} <small class="tonly">${esc(v.tehsil)}</small><span class="p">${v.psub}%</span></h3>${bar(v)}
+    <div class="cnt">${fmt(v.generated)} generated · ${fmt(v.not_generated)} not generated · ${fmt(v.pending)} not yet submitted · ${fmt(v.farmer_ids)} IDs</div>
+    <ul>${c.lines.map(l=>`<li>${l}</li>`).join('')}</ul><div class="next">Next: ${c.next}</div></div>`).join('')||'<p class="muted">No villages yet.</p>';
+}
+$('#vcsort').addEventListener('change',renderConclusions);
+
+/* ---------------- villages ---------------- */
+function genPass(){const a='abcdefghjkmnpqrstuvwxyz23456789'; let s=''; crypto.getRandomValues(new Uint32Array(10)).forEach(x=>s+=a[x%a.length]); return s;}
+function renderVillageList(){
+  if(!D) return;
+  $('#vcount').textContent=`${D.villages.length}`;
+  const by=D.tehsils.map(t=>[t,D.villages.filter(v=>v.tehsil===t).sort((a,b)=>a.village.localeCompare(b.village))]).filter(x=>x[1].length);
+  $('#vlist').innerHTML=by.length?by.map(([t,list])=>`<div class="tgroup"><h3>${ONE()?'Villages':esc(t)} (${list.length})</h3><div class="tw"><table><thead><tr><th class="l">Village</th><th class="l">Page on the website</th><th class="l">Entries</th><th class="l">Status</th><th class="l"></th></tr></thead><tbody>${list.map(v=>`<tr data-v="${esc(v.village)}" data-vt="${esc(v.tehsil)}">
+      <td class="l"><b>${esc(v.village)}</b></td><td class="l"><a href="${slug(v.village)}.html" target="_blank" rel="noopener">${slug(v.village)}.html</a></td>
+      <td class="l muted">${v.total?`${fmt(v.submitted)} of ${fmt(v.total)}`:'buckets not loaded'}</td>
+      <td class="l">${v.active?'<span class="g">Open</span>':'<span class="n">Closed</span>'}</td>
+      <td class="l"><button class="btn sec sm" data-act="edit">Edit</button> <button class="btn sec sm" data-act="toggle">${v.active?'Close':'Open'}</button></td></tr>`).join('')}</tbody></table></div></div>`).join(''):'<p class="muted">No villages yet.</p>';
+}
+let XL=null;
+const XLHINT='Choosing it fills in the details below and loads every bucket into the Google Sheet.';
+$('#f-xl').addEventListener('change',async e=>{
+  XL=null; const f=e.target.files[0]; if(!f){ $('#xlinfo').textContent=XLHINT; return; }
+  try{
+    if(typeof XLSX==='undefined') throw new Error('The Excel reader could not load. Check the internet connection and reload.');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const bs=wb.Sheets['Buckets']; if(!bs) throw new Error('This is not a village Excel from the generator (no "Buckets" sheet).');
+    const aoa=XLSX.utils.sheet_to_json(bs,{header:1,raw:true,defval:''});
+    const setup={}; if(wb.Sheets['Setup']) XLSX.utils.sheet_to_json(wb.Sheets['Setup'],{header:1,defval:''}).forEach(r=>{ if(r[0]) setup[String(r[0]).trim()]=String(r[1]??'').trim(); });
+    XL={header:aoa[0],rows:aoa.slice(1).filter(r=>String(r[1]??'').trim()!=='')};
+    if(!editing){ if(setup.Tehsil) $('#f-tehsil').value=setup.Tehsil; if(setup.Village) $('#f-village').value=setup.Village; }
+    const mismatch=editing&&setup.Village&&setup.Village.toLowerCase()!==editing.village.toLowerCase();
+    $('#xlinfo').innerHTML=mismatch?`<span class="n">This Excel is for ${esc(setup.Village)}, not ${esc(editing.village)}.</span>`:
+      `${XL.rows.length} buckets for ${esc(setup.Village||'the village')}${setup.Tehsil?' ('+esc(setup.Tehsil)+')':''}. They will be loaded into the Google Sheet when you save.`;
+    if(mismatch) XL=null;
+  }catch(err){ $('#xlinfo').innerHTML=`<span class="n">${esc(err.message)}</span>`; }
+});
+function resetForm(){editing=null; XL=null; $('#vform').reset(); $('#xlinfo').textContent=XLHINT; $('#formTitle').textContent='Add a village'; $('#fsave').textContent='Add village'; $('#fcancel').hidden=true;}
+$('#fcancel').addEventListener('click',()=>{resetForm(); $('#fmsg').innerHTML='';});
+$('#vform').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#fmsg').innerHTML='';
+  const p={tehsil:$('#f-tehsil').value,village:$('#f-village').value.trim()};
+  // village logins are no longer used (entry is by the common PIN); the backend still stores a placeholder login per village
+  if(editing){ p.username=editing.username; p.password=''; p.orig_tehsil=editing.tehsil; p.orig_village=editing.village; }
+  else { p.username=(slug(p.village).replace(/_/g,'').slice(0,18)+'_'+slug(p.tehsil).replace(/_/g,'').slice(0,8)).replace(/^_/,'v_'); p.password=genPass(); }
+  if(XL){p.header=XL.header; p.rows=XL.rows;}
+  if(!editing&&!XL&&!confirm('No village Excel chosen. Add the village without loading its buckets? They can be loaded later with Edit.')) return;
+  $('#fsave').disabled=true;
+  try{ const j=await api('adminSaveVillage',p);
+    $('#fmsg').innerHTML=`<div class="msg ok">${editing?'Saved':'Added'} <b>${esc(p.village)}</b> (${esc(p.tehsil)}).${j.loaded?` ${fmt(j.loaded)} buckets loaded into the Google Sheet.`:''}${j.moved?` ${fmt(j.moved)} earlier ${j.moved===1?'entry was':'entries were'} carried over to the new bucket numbers.`:''}${j.unmatched?` ${fmt(j.unmatched)} earlier ${j.unmatched===1?'entry':'entries'} fitted no bucket in this file and ${j.unmatched===1?'is':'are'} kept in the tab “${esc(j.kept_in)}”.`:''} Its page must be on the website as <code>${slug(p.village)}.html</code>.</div>`;
+    resetForm(); await refresh();
+  }catch(err){ $('#fmsg').innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+  finally{ $('#fsave').disabled=false; }
+});
+$('#vlist').addEventListener('click',async e=>{
+  const b=e.target.closest('button[data-act]'); if(!b) return;
+  const tr=b.closest('tr'), v=D.villages.find(x=>x.village===tr.dataset.v&&x.tehsil===tr.dataset.vt);
+  if(b.dataset.act==='edit'){ editing=v; XL=null; $('#f-xl').value=''; $('#xlinfo').textContent='Optional: choose an updated village Excel to refresh its bucket list. Entries already made are kept.'; $('#f-tehsil').value=v.tehsil; $('#f-village').value=v.village;
+    $('#formTitle').textContent='Edit '+v.village; $('#fsave').textContent='Save changes'; $('#fcancel').hidden=false; window.scrollTo({top:0,behavior:'smooth'}); return; }
+  try{
+    if(b.dataset.act==='toggle'){ if(v.active&&!confirm(`Close ${v.village}? Entries on its page will stop saving.`)) return;
+      await api('adminSaveVillage',{tehsil:v.tehsil,village:v.village,username:v.username,orig_tehsil:v.tehsil,orig_village:v.village,active:!v.active}); toast(`${v.village} ${v.active?'closed':'opened'}`); }
+    await refresh();
+  }catch(err){ toast(err.message); }
+});
+
+/* ---------------- reasons ---------------- */
+function renderReasonList(){
+  const used=sum(D.villages).reasons, list=D.reasons||[];
+  $('#rcount').textContent=`${list.length}`;
+  $('#rlist').innerHTML=list.length?list.map(r=>`<div class="rrow"><span>${esc(r)} ${used[r]?`<small class="muted">used ${fmt(used[r])} time${used[r]===1?'':'s'}</small>`:''}</span><button class="btn sec sm" data-edit="${esc(r)}">Edit wording</button> <button class="btn sec sm" data-r="${esc(r)}">Remove</button></div>`).join(''):'<p class="muted" style="margin:0">No reasons yet. Add at least one, otherwise “Not generated” cannot be completed on village pages.</p>';
+}
+$('#rform').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#rmsg').innerHTML='';
+  try{ const j=await api('adminAddReason',{reason:$('#rtext').value}); D.reasons=j.reasons; $('#rform').reset(); await refresh(); toast('Reason added'); }
+  catch(err){ $('#rmsg').innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+});
+$('#rlist').addEventListener('click',async e=>{
+  const ed=e.target.closest('button[data-edit]');
+  if(ed){ const row=ed.closest('.rrow'), r=ed.dataset.edit, used=sum(D.villages).reasons[r]||0;
+    row.innerHTML=`<form class="redit" style="display:flex;gap:8px;flex:1;flex-wrap:wrap"><input class="in" style="flex:1 1 260px" maxlength="80" value="${esc(r)}" aria-label="New wording"><button class="btn sm" type="submit">Save</button><button class="btn sec sm" type="button" data-cancel="1">Cancel</button>
+      <small class="muted" style="width:100%">For small changes in wording. ${used?`The ${fmt(used)} ${used===1?'entry':'entries'} with this reason will show the new wording.`:'No entry uses this reason yet.'}</small></form>`;
+    const f=row.querySelector('form'), inp=f.querySelector('input'); inp.focus(); inp.select();
+    f.querySelector('[data-cancel]').onclick=()=>renderReasonList();
+    f.onsubmit=async ev=>{ ev.preventDefault(); const to=inp.value.replace(/\s+/g,' ').trim(); if(!to||to===r){ renderReasonList(); return; }
+      f.querySelector('button[type=submit]').disabled=true; $('#rmsg').innerHTML='';
+      try{ const j=await api('adminRenameReason',{from:r,to}); await refresh();
+        $('#rmsg').innerHTML=`<div class="msg ok">“${esc(r)}” now reads “${esc(to)}”.${j.entries?` ${fmt(j.entries)} ${j.entries===1?'entry':'entries'} in ${fmt(j.villages)} village${j.villages===1?'':'s'} changed with it.`:''}</div>`; toast('Reason edited'); }
+      catch(err){ f.querySelector('button[type=submit]').disabled=false; toast(err.message); } };
+    return; }
+  const b=e.target.closest('button[data-r]'); if(!b) return; const r=b.dataset.r, used=sum(D.villages).reasons[r]||0;
+  if(!confirm(`Remove “${r}” from the list?${used?` ${used} existing ${used===1?'entry keeps':'entries keep'} it and will be shown under “Needs attention”.`:''}`)) return;
+  $('#rmsg').innerHTML='';
+  try{ await api('adminDeleteReason',{reason:r}); await refresh(); toast('Reason removed'); }catch(err){ toast(err.message); }
+});
+
+/* ---------------- settings ---------------- */
+async function loadPin(){ try{ const j=await api('adminGetPin'); $('#curpin').textContent=j.pin; }catch(e){ $('#curpin').textContent='–'; } }
+$('#pinform').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#pinmsg').innerHTML='';
+  try{ const j=await api('adminSetPin',{new_pin:$('#newpin').value.trim()}); $('#curpin').textContent=j.pin; $('#pinform').reset();
+    $('#pinmsg').innerHTML=`<div class="msg ok">PIN changed to <code>${esc(j.pin)}</code>. Devices using the old PIN will be asked for the new one at their next save.</div>`; }
+  catch(err){ $('#pinmsg').innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+});
+$('#pform').addEventListener('submit',async e=>{
+  e.preventDefault(); $('#pmsg').innerHTML='';
+  try{ await api('adminChangePassword',{old_password:$('#op').value,new_password:$('#np').value}); $('#pform').reset(); $('#pmsg').innerHTML='<div class="msg ok">Password changed.</div>'; }
+  catch(err){ $('#pmsg').innerHTML=`<div class="msg err">${esc(err.message)}</div>`; }
+});
+
+/* ---------------- tabs & boot ---------------- */
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.tab'); if(!t) return;
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===t));
+  ['dash','vill','ana','rsn','clm','set'].forEach(k=>$('#p-'+k).hidden=k!==t.dataset.tab);
+  if(t.dataset.tab==='set') loadPin();
+});
+if(!APPS_SCRIPT_URL){ document.body.insertAdjacentHTML('afterbegin','<div class="msg err" style="margin:12px">The portal link is not set. On GitHub, open config.js and paste the Apps Script /exec link between the quotes.</div>'); }
+else if(S&&S.token) refresh(); else showLogin();
+</script>
+</body>
+</html>

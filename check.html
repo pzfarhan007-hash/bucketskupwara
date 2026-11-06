@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="config.js"></script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portal check – Kupwara</title>
+<style>
+:root{--ink:#1c2a36;--ink-2:#4a5a67;--ink-3:#7c8a95;--paper:#f5f6f3;--card:#fff;--line:#dde2dc;--line-2:#eceee9;
+  --field:#2f6b4f;--field-bg:#e6f0ea;--brick:#a8432a;--brick-bg:#f8e3dc;--amber:#8a5a10;--amber-bg:#fbf1dc;--focus:#2a6fdb}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#e6ebef;--ink-2:#b3bec7;--ink-3:#86939d;--paper:#141a1f;--card:#1c242b;--line:#2f3a43;--line-2:#252f37;
+  --field:#6cc19a;--field-bg:#1e3329;--brick:#ef8f76;--brick-bg:#3b231d;--amber:#f0c677;--amber-bg:#3a2d17}}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:900px;margin:0 auto;padding:26px 18px 60px}
+h1{font:600 26px/1.2 Georgia,serif;margin:0}
+.sub{color:var(--ink-2);margin:6px 0 16px;max-width:66ch}
+.card{background:var(--card);border:1px solid #c9d0d6;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.in{flex:1 1 320px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--card);font-size:14px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600}
+.btn:disabled{opacity:.5}
+h2{font-size:16px;margin:0 0 8px}
+.item{display:grid;grid-template-columns:22px 1fr;gap:4px 8px;padding:8px 0;border-top:1px solid var(--line-2)}
+.item:first-of-type{border-top:0}
+.dot{width:14px;height:14px;border-radius:50%;margin-top:4px}
+.ok .dot{background:var(--field)} .bad .dot{background:var(--brick)} .warn .dot{background:#c98a1b} .run .dot{background:var(--ink-3)}
+.item b{font-weight:600}
+.fix{grid-column:2;font-size:14px;border-radius:7px;padding:6px 10px;margin-top:2px}
+.bad .fix{background:var(--brick-bg);color:var(--brick)} .warn .fix{background:var(--amber-bg);color:var(--amber)}
+.det{grid-column:2;font-size:13px;color:var(--ink-3);word-break:break-word}
+.overall{font-weight:600;padding:10px 12px;border-radius:8px;margin-bottom:14px}
+.overall.ok{background:var(--field-bg);color:var(--field)} .overall.bad{background:var(--brick-bg);color:var(--brick)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Portal check</h1>
+  <p class="sub">Checks that the Google Sheet link is live, that the latest code is deployed, and that every page on this site is the latest version and points to the same link. Each problem comes with what to do.</p>
+  <div class="card">
+    <div class="row"><input class="in" id="url" spellcheck="false" aria-label="Apps Script URL"><button class="btn" id="go">Run check</button></div>
+  </div>
+  <div id="overall"></div>
+  <div class="card" id="c1" hidden><h2>1. Google Sheet link (Apps Script)</h2><div id="r1"></div></div>
+  <div class="card" id="c2" hidden><h2>2. Pages on this website</h2><div id="r2"></div></div>
+  <div class="card" id="c3" hidden><h2>3. Village pages</h2><div id="r3"></div></div>
+</div>
+<script>
+const DEFAULT_URL=(window.PORTAL_URL||"").trim();
+const NEED=['ping','publicSummary','openList','checkPin','openSave','adminGetPin','adminSetPin','adminAddReason','adminDeleteReason','adminSaveClaims','adminMarkClaimed','adminRenameReason'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const slug=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+$('#url').value=/^https:/.test(DEFAULT_URL)?DEFAULT_URL:'';
+let problems=0;
+function add(box,state,title,detail,fix){ if(state==='bad') problems++;
+  $(box).insertAdjacentHTML('beforeend',`<div class="item ${state}"><span class="dot"></span><div><b>${title}</b></div>${detail?`<div class="det">${detail}</div>`:''}${fix&&state!=='ok'?`<div class="fix">${fix}</div>`:''}</div>`); }
+/* One call to the Google Sheet. When Google is busy it answers with an error page instead of data
+   ("Unexpected token '<'"). The call is then tried again by itself a few times before anything is shown. */
+async function sheetCall(url,payload,tries=4){
+  let said='', net=false;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      const text=await r.text(); net=false;
+      try{ const j=JSON.parse(text); if(!(j&&j.busy)) return j; said=''; }
+      catch(_){ said=text.replace(/<(script|style)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim().slice(0,90); }
+    }catch(e){ net=true; }
+    if(i<tries-1) await new Promise(res=>setTimeout(res,[1500,3500,7000][i]+Math.random()*1200));
+  }
+  const e=new Error(net?'no connection to the Google Sheet':'the Google Sheet is busy'+(said?' – Google said “'+said+'”':'')); e.busy=true; throw e;
+}
+async function post(url,body){ return sheetCall(url,body,3); }
+const onSite=location.protocol.startsWith('http');
+async function page(name){ try{ const r=await fetch(name+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return {missing:true}; const t=await r.text();
+    const m=t.match(/const APPS_SCRIPT_URL\s*=\s*"([^"]*)"/); return {text:t,url:m?m[1]:null}; }catch(e){ return {missing:true}; } }
+const REDEPLOY='In Apps Script: paste the latest backend code, Save, then Deploy → Manage deployments → pencil → Version: New version → Deploy. Do not use “New deployment”.';
+
+$('#go').addEventListener('click',async()=>{
+  const url=$('#url').value.trim(); problems=0;
+  ['#r1','#r2','#r3'].forEach(x=>$(x).innerHTML=''); ['#c1','#c2','#c3'].forEach(x=>$(x).hidden=true); $('#overall').innerHTML='';
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)){ $('#c1').hidden=false; add('#r1','bad','This is not an Apps Script web-app link',esc(url),'It must look like https://script.google.com/macros/s/…/exec. Copy it from Apps Script → Deploy → Manage deployments.'); return done(); }
+  $('#go').disabled=true; $('#c1').hidden=false;
+  /* ---- 1. backend ---- */
+  let ping=null, villages=[];
+  try{ ping=await post(url,{action:'ping'}); }
+  catch(e){ add('#r1','bad','The link does not answer',esc(e.message),'Either this deployment was archived or replaced by a new one, or its access is not “Anyone”. In Apps Script → Deploy → Manage deployments, check the active Web app: Execute as “Me”, Who has access “Anyone”. Copy its URL; if it differs from the one above, the pages need the new URL (use the page updater and the fresh admin/index files).'); $('#go').disabled=false; return done(); }
+  add('#r1','ok','The link is live',esc(url));
+  if(!ping.ok){ add('#r1','bad','Old code is deployed',`The link answered “${esc(ping.error||'error')}”.`,REDEPLOY); }
+  else{
+    add('#r1','ok','Code version: '+esc(ping.version),`Google Sheet: ${esc(ping.sheet)}`);
+    const miss=NEED.filter(f=>!(ping.features||[]).includes(f));
+    if(miss.length) add('#r1','bad','Deployed code is missing: '+miss.join(', '),'',REDEPLOY); else add('#r1','ok','All needed functions are present');
+    if(!ping.setup_done) add('#r1','bad','setup() has not been run on this sheet','','In Apps Script choose the function “setup” and press Run.');
+    if(!ping.reasons) add('#r1','warn','The Reasons tab is empty','','Add the reasons for “Not generated” in the Reasons tab of the Google Sheet, one per row.'); else add('#r1','ok',`${ping.reasons} reasons in the Reasons tab`);
+  }
+  try{ const s=await post(url,{action:'publicSummary'}); if(s.ok){ villages=s.villages||[]; add('#r1',villages.length?'ok':'warn',`${villages.length} village${villages.length===1?'':'s'} registered in the sheet`,villages.map(v=>esc(v.village)+' ('+esc(v.tehsil)+')').join(', '),'Add villages in admin → Villages, using each village’s _sheet.xlsx.'); }
+       else add('#r1','bad','The progress summary failed',esc(s.error),REDEPLOY); }catch(e){}
+  try{ const p=await post(url,{action:'checkPin',pin:'\u0000'}); if(p.pin) add('#r1','ok','Edit PIN is being enforced','A wrong PIN is refused.'); else if(p.ok) add('#r1','bad','The PIN check accepted a wrong PIN','',REDEPLOY); }catch(e){}
+
+  /* ---- 2 & 3. pages on the site ---- */
+  $('#c2').hidden=false;
+  if(!onSite){ add('#r2','warn','Page checks skipped','This file was opened from your computer.','Upload check.html to GitHub next to index.html and open it from the website to also check every page.'); $('#go').disabled=false; return done(); }
+  const sameUrl=(p,label)=>{ if(p.url===url) return true; add('#r2','bad',`${label} points to a different link`,esc(p.url||'(none)'),`Replace ${label} with the fresh file that has the link above.`); return false; };
+  const ix=await page('index.html');
+  if(ix.missing) add('#r2','bad','index.html is missing','','Upload index.html to the top folder of the GitHub repository.');
+  else if(!ix.text.includes('publicSummary')) add('#r2','bad','index.html is the old plain page','It only shows an “Admin login” button.','Delete index.html in GitHub and upload the fresh index.html (the progress board).');
+  else if(!ix.text.includes('of buckets submitted')) add('#r2','bad','index.html is an older progress board','It does not show Generated / Not generated / Not yet submitted.','Delete index.html in GitHub and upload the fresh index.html.');
+  else if(sameUrl(ix,'index.html')) add('#r2','ok','index.html is the progress board and uses this link');
+  const ad=await page('admin.html');
+  if(ad.missing) add('#r2','bad','admin.html is missing','','Upload admin.html to the top folder of the GitHub repository.');
+  else if(!ad.text.includes('adminSummary')) add('#r2','bad','admin.html belongs to another portal','It is not the admin page of the Farmer ID by Bucket portal.','Delete admin.html in GitHub and upload the fresh admin.html.');
+  else if(!ad.text.includes('adminRenameReason')) add('#r2','bad','admin.html is an older version','It has no “Edit wording” button for reasons.','Delete admin.html in GitHub and upload the fresh admin.html.');
+  else if(sameUrl(ad,'admin.html')) add('#r2','ok','admin.html is the latest and uses this link');
+
+  $('#c3').hidden=false;
+  if(!villages.length) add('#r3','warn','No villages to check');
+  for(const v of villages){
+    const f=slug(v.village)+'.html', p=await page(f), name=`${esc(v.village)} (${esc(f)})`;
+    if(p.missing){ add('#r3','bad',name+': page not on the website','The village is in the sheet but its page is not in GitHub (or has a different file name).',`Upload ${esc(f)} to the top folder of the GitHub repository. The name must be exactly ${esc(f)}.`); continue; }
+    const ver=p.text.includes('REPORT_DOWNLOADS')?'pin':p.text.includes('CLAIM_STATUS')?'norep':p.text.includes('sheetCall(')?'noclaim':p.text.includes('REASON_BEFORE_SAVE')?'nowait':p.text.includes('REMARKS_NEED_REASON')?'noreason':p.text.includes("PIN_KEPT='page-only'")?'norule':p.text.includes("api('checkPin')")?'pinold':p.text.includes("api('openSave'")?'open':p.text.includes('id="lform"')?'login':'old';
+    const mv=(p.text.match(/const VILLAGE\s*=\s*"([^"]*)"/)||[])[1], mt=(p.text.match(/const TEHSIL\s*=\s*"([^"]*)"/)||[])[1];
+    const errs=[];
+    if(ver!=='pin') errs.push({norep:'It is the version without the Download PDF / Excel buttons.',noclaim:'It is the version without the AgriStack claimed / unclaimed status.',nowait:'It is the version that shows an error when the Google Sheet is busy instead of trying again by itself.',noreason:'It is the version that accepts “Not generated” without a reason.',norule:'It is the version that lets remarks be typed without choosing a reason.',pinold:'It is the version that remembers the PIN after the browser is closed.',login:'It is the username/password version.',open:'It is the no-PIN version.',old:'It is an early version.'}[ver]+' Run it through the page updater and upload the result.');
+    if(p.url!==url) errs.push('It points to a different link. Run it through the page updater (which sets the link above) and upload the result.');
+    if(mv!==undefined&&mv.trim().toLowerCase()!==String(v.village).trim().toLowerCase()) errs.push(`The page says village “${esc(mv)}” but the sheet says “${esc(v.village)}”.`);
+    let note='';
+    if(mt!==undefined&&mt&&mt.trim().toLowerCase()!==String(v.tehsil).trim().toLowerCase()){
+      const dup=villages.filter(x=>String(x.village).trim().toLowerCase()===String(v.village).trim().toLowerCase()).length>1;
+      if(((ping&&ping.features)||[]).includes('tehsilFromSheet')&&!dup) note=` · the page was made with tehsil “${esc(mt)}”; the sheet’s tehsil “${esc(v.tehsil)}” is used, nothing to do`;
+      else errs.push(dup?`The page says tehsil “${esc(mt)}” but the sheet says “${esc(v.tehsil)}”, and this village name is registered in more than one tehsil. Run the page through the page updater and choose the right tehsil.`:`The page says tehsil “${esc(mt)}” but the sheet says “${esc(v.tehsil)}”. Paste the latest backend code in Apps Script and deploy a New version: it then takes the tehsil from the sheet for every village.`);
+    }
+    if(!v.total) errs.push('No buckets are loaded in the sheet for this village. In admin → Villages → Edit, choose its _sheet.xlsx and save.');
+    if(errs.length) add('#r3','bad',name,'',errs.join('<br>')); else add('#r3','ok',name,`${v.total} buckets, ${v.generated} generated, ${v.not_generated} not generated${note}`);
+  }
+  $('#go').disabled=false; done();
+});
+function done(){ $('#overall').innerHTML=problems?`<div class="overall bad">${problems} problem${problems===1?'':'s'} found. Fix them from the top down, then run the check again.</div>`:`<div class="overall ok">Everything checked is working.</div>`; }
+</script>
+</body>
+</html>

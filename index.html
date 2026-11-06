@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="config.js"></script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farmer ID by Bucket – Kupwara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet">
+<script>
+/* ============ SETTINGS ============ */
+const APPS_SCRIPT_URL = (window.PORTAL_URL||"").trim();   // the portal's Apps Script /exec URL (set by the portal page updater)
+</script>
+<style>
+:root{--ink:#1c2a36;--ink-2:#4a5a67;--ink-3:#7c8a95;--paper:#f5f6f3;--card:#fff;--line:#dde2dc;--line-2:#eceee9;--card-line:#c9d0d6;
+  --field:#2f6b4f;--amber:#c98a1b;--amber-ink:#8a5a10;--brick:#a8432a;--grey:#d5dad6;--slate:#43607a;--focus:#2a6fdb}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#e6ebef;--ink-2:#b3bec7;--ink-3:#86939d;--paper:#141a1f;--card:#1c242b;--line:#2f3a43;--line-2:#252f37;--card-line:#3a4650;
+  --field:#6cc19a;--amber:#e2a93b;--amber-ink:#f0c677;--brick:#ef8f76;--grey:#3a4650;--slate:#9ab8d3}}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px 40px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 18px;padding:24px 0 14px}
+header div{flex:1;min-width:240px}
+h1{font:600 27px/1.15 "IBM Plex Serif",Georgia,serif;margin:0}
+.sub{color:var(--ink-2);margin:6px 0 0}
+.adminlink{font-size:14px;color:var(--ink-2);text-decoration:underline}
+
+/* district strip */
+.strip{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(20,30,40,.05)}
+.strip .top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.strip .top .big{font-size:38px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.strip .top .lbl{font-size:15px;color:var(--ink-2)}
+.strip .top .of{font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.strip .top .sp{flex:1}
+.strip .top .upd{font-size:12px;color:var(--ink-3)}
+.linkbtn{background:none;border:0;padding:0;color:var(--ink-2);text-decoration:underline;cursor:pointer;font-size:12px}
+.bar{height:10px;border-radius:5px;background:var(--grey);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.bar.big{height:14px;border-radius:7px;margin-top:12px}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 18px;margin-top:14px}
+.num{border-left:4px solid var(--ink-3);padding-left:10px}
+.num b{display:block;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums}
+.num span{font-size:13px;color:var(--ink-2)}
+.num.g{border-color:var(--field)} .num.g b{color:var(--field)}
+.num.a{border-color:var(--amber)} .num.a b{color:var(--amber-ink)}
+.num.b{border-color:var(--brick)} .num.b b{color:var(--brick)}
+.num small{display:block;font-size:11px;color:var(--ink-3)}
+.num.i{border-color:var(--slate)} .num.i b{color:var(--slate)}
+
+/* colour key */
+.key{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:var(--ink-2);margin:8px 0 0}
+.key b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.key i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+.jump{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 0 10px;padding-bottom:2px}
+.jump::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--card-line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--tc)}
+.chip b{font-weight:600;color:var(--tc)}
+.search{width:100%;border:1px solid var(--card-line);border-radius:8px;padding:9px 12px;background:var(--card);margin-bottom:12px;font-size:16px}
+
+/* tehsil block */
+.teh.one>.th{display:none}
+.teh{background:var(--card);border:1px solid var(--card-line);border-left:5px solid var(--tc);border-radius:12px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 2px rgba(20,30,40,.05)}
+.th{display:grid;grid-template-columns:1fr auto;gap:4px 16px;padding:14px 16px;cursor:pointer;align-items:center;border:0;background:none;width:100%;text-align:left}
+.th:hover{background:color-mix(in srgb,var(--tc) 5%,transparent)}
+.th h2{margin:0;font-size:18px;color:var(--tc);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.th h2 .car{font-size:12px;color:var(--ink-3);transition:transform .15s}
+.th h2 small{font-size:13px;font-weight:400;color:var(--ink-2)}
+.teh.shut .car{transform:rotate(-90deg)}
+.th .pc{text-align:right;line-height:1.1}
+.th .pc b{font-size:22px;font-weight:600;color:var(--tc);font-variant-numeric:tabular-nums}
+.th .pc span{display:block;font-size:11px;color:var(--ink-3)}
+.th .bar{grid-column:1/3;margin-top:6px}
+.cnt{grid-column:1/3;display:flex;flex-wrap:wrap;gap:2px 16px;font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;margin-top:6px}
+.cnt b{font-weight:600}
+.cnt .g b{color:var(--field)} .cnt .a b{color:var(--amber-ink)} .cnt .i b{color:var(--slate)}
+.rows{border-top:1px solid var(--line-2)}
+.teh.shut .rows{display:none}
+.vr{display:grid;grid-template-columns:minmax(150px,1.2fr) 1.6fr 56px auto;gap:4px 14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line-2);text-decoration:none}
+.vr:last-child{border-bottom:0}
+.vr:hover{background:color-mix(in srgb,var(--tc) 5%,transparent)}
+.vr .nm{font-weight:600}
+.vr .cnt{grid-column:auto;margin-top:1px;font-size:12px;font-weight:400;gap:0 12px}
+.vr .p{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.vr .go{font-size:13px;color:var(--tc);white-space:nowrap}
+.vr.zero .p{color:var(--ink-3);font-weight:400}
+.pill{font-size:11px;border-radius:5px;padding:1px 6px;background:var(--line-2);color:var(--ink-3);font-weight:500;margin-left:6px}
+.msg{padding:26px 0;text-align:center;color:var(--ink-3)}
+.err{color:var(--brick)}
+
+/* role cards */
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:20px}
+.role{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(20,30,40,.05)}
+.role h3{margin:0 0 4px;font-size:16px}
+.role p{margin:0;color:var(--ink-2);font-size:14px}
+.role a{display:inline-block;margin-top:10px;font-weight:500;color:var(--slate)}
+footer{font-size:13px;color:var(--ink-3);padding-top:22px;text-align:center}
+@media (max-width:640px){h1{font-size:22px}.strip .top .big{font-size:32px}
+  .vr{grid-template-columns:1fr 54px}.vr .bar{grid-column:1/3;order:3}.vr .go{display:none}}
+@media (prefers-reduced-motion:reduce){.th h2 .car{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Farmer ID by Bucket – Tracking</h1>
+    <p class="sub">District <span id="dist">Kupwara</span> · Farmer ID generation against AgriStack land buckets, village by village.</p></div>
+    <a class="adminlink" href="admin.html">Admin login</a>
+  </header>
+
+  <section class="strip" id="district"><div class="msg">Loading…</div></section>
+
+  <div class="jump" id="jump"></div>
+  <input class="search" id="q" type="search" placeholder="Search village" autocomplete="off">
+  <div id="tehsils"></div>
+
+  <div class="roles">
+    <div class="role"><h3>Entering data for a village</h3>
+      <p>Open your village from the list above. Anyone can view it. When you tap Generated, Not generated or Reset on a bucket, the page asks for the PIN and then stays in editing mode until it is closed.</p></div>
+    <div class="role"><h3>Administrator</h3>
+      <p>Add villages, see the analysis for each village and the district, manage the list of reasons and change the PIN.</p>
+      <a href="admin.html">Admin login →</a></div>
+  </div>
+  <footer>Developed and maintained by Obaid Peerzada</footer>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n||0).toLocaleString('en-IN');
+const pct=(a,b)=>b?Math.round(a*1000/b)/10:0;
+const slug=v=>String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');   // same rule as the generator
+// tehsil colours: no green or amber, so they never look like progress colours
+const PALETTE=['#2b5d9b','#7a3f9d','#3f4fb0','#a3345f','#1f6f8b','#6b4f2a','#5b3fa0','#8a3f7a','#2f4f6f','#556070'];
+const tColor=t=>{let h=0; for(const c of String(t)) h=(h*31+c.charCodeAt(0))>>>0; return PALETTE[h%PALETTE.length];};
+let D=null, open=new Set(), firstRender=true;
+
+function roll(list){
+  const s={villages:list.length,total:0,generated:0,not_generated:0,farmer_ids:0};
+  list.forEach(v=>{s.total+=+v.total||0; s.generated+=+v.generated||0; s.not_generated+=+v.not_generated||0; s.farmer_ids+=+v.farmer_ids||0;});
+  s.submitted=s.generated+s.not_generated; s.not_claimed=Math.max(0,s.total-s.generated); s.pending=Math.max(0,s.total-s.submitted); s.psub=pct(s.submitted,s.total);
+  return s;
+}
+const bar=(s,cls='')=>`<span class="bar ${cls}" role="img" aria-label="${s.psub}% submitted: ${s.generated} generated, ${s.not_generated} not generated, ${s.pending} not yet submitted"><i style="width:${s.total?s.generated*100/s.total:0}%;background:var(--field)"></i><i style="width:${s.total?s.not_generated*100/s.total:0}%;background:var(--amber)"></i></span>`;
+const counts=s=>`<span class="cnt"><span class="g"><b>${fmt(s.generated)}</b> generated</span><span class="a"><b>${fmt(s.not_generated)}</b> not generated</span><span><b>${fmt(s.pending)}</b> not yet submitted</span><span class="i"><b>${fmt(s.farmer_ids)}</b> Farmer IDs</span></span>`;
+
+/* One call to the Google Sheet. When Google is busy it answers with an error page instead of data
+   ("Unexpected token '<'"). The call is then tried again by itself a few times before anything is shown. */
+async function sheetCall(url,payload,tries=4){
+  let said='', net=false;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      const text=await r.text(); net=false;
+      try{ const j=JSON.parse(text); if(!(j&&j.busy)) return j; said=''; }
+      catch(_){ said=text.replace(/<(script|style)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim().slice(0,90); }
+    }catch(e){ net=true; }
+    if(i<tries-1) await new Promise(res=>setTimeout(res,[1500,3500,7000][i]+Math.random()*1200));
+  }
+  const e=new Error(net?'no connection to the Google Sheet':'the Google Sheet is busy'+(said?' – Google said “'+said+'”':'')); e.busy=true; throw e;
+}
+async function load(){
+  try{
+    if(!APPS_SCRIPT_URL||APPS_SCRIPT_URL.startsWith('__')) throw new Error('The portal link is not set. On GitHub, open config.js and paste the Apps Script /exec link between the quotes.');
+    const j=await sheetCall(APPS_SCRIPT_URL,{action:'publicSummary'}); if(!j.ok) throw new Error(j.error||'Could not load');
+    D=j; render();
+  }catch(e){
+    const m=e.busy?e.message[0].toUpperCase()+e.message.slice(1)+'. Please try again in a moment.':e.message;
+    $('#district').innerHTML=`<div class="msg err">${esc(m)} <button class="linkbtn" id="rf">Try again</button></div>`;
+  }
+}
+function render(){
+  const q=$('#q').value.trim().toLowerCase();
+  const all=D.villages, d=roll(all);
+  $('#dist').textContent=D.district;
+  $('#district').innerHTML=`<div class="top"><span class="big">${d.psub}%</span><span class="lbl">of buckets submitted</span>
+      <span class="of">${fmt(d.submitted)} of ${fmt(d.total)} buckets</span><span class="sp"></span>
+      <span class="upd">Updated ${new Date(D.at).toLocaleTimeString([],{timeStyle:'short'})} · <button class="linkbtn" id="rf">Refresh</button></span></div>
+    ${bar(d,'big')}
+    <div class="key"><span><i style="background:var(--field)"></i>Generated <b>${fmt(d.generated)}</b></span><span><i style="background:var(--amber)"></i>Not generated <b>${fmt(d.not_generated)}</b></span><span><i style="background:var(--grey)"></i>Not yet submitted <b>${fmt(d.pending)}</b></span></div>
+    <div class="nums">
+      <div class="num"><b>${fmt(d.villages)}</b><span>Total villages</span></div>
+      <div class="num"><b>${fmt(d.total)}</b><span>Total buckets</span></div>
+      <div class="num g"><b>${fmt(d.generated)}</b><span>Buckets claimed</span></div>
+      <div class="num b"><b>${fmt(d.not_claimed)}</b><span>Buckets not claimed</span><small>total − claimed</small></div>
+      <div class="num i"><b>${fmt(d.farmer_ids)}</b><span>Farmer IDs generated</span></div>
+    </div>`;
+  const known=D.tehsils||[], tehs=known.filter(t=>all.some(v=>v.tehsil===t)).concat([...new Set(all.map(v=>v.tehsil))].filter(t=>!known.includes(t)));
+  if(firstRender&&tehs.length){ if(tehs.length<=3) tehs.forEach(t=>open.add(t)); firstRender=false; }
+  $('#jump').innerHTML=tehs.length>1?tehs.map(t=>{const s=roll(all.filter(v=>v.tehsil===t)); return `<button class="chip" data-t="${esc(t)}" style="--tc:${tColor(t)}"><i></i>${esc(t)} <b>${s.psub}%</b></button>`;}).join(''):'';
+  const html=tehs.map(t=>{
+    const vs=all.filter(v=>v.tehsil===t&&(!q||v.village.toLowerCase().includes(q))).sort((a,b)=>a.village.localeCompare(b.village));
+    if(q&&!vs.length) return '';
+    const one=tehs.length===1, s=roll(vs), shut=!one&&!(open.has(t)||q);
+    return `<section class="teh ${shut?'shut':''} ${one?'one':''}" id="t-${slug(t)}" style="--tc:${tColor(t)}">
+      <button class="th" data-t="${esc(t)}" aria-expanded="${!shut}">
+        <h2><span class="car">▼</span>${esc(t)} <small>${s.villages} village${s.villages===1?'':'s'} · ${fmt(s.total)} buckets</small></h2>
+        <span class="pc"><b>${s.psub}%</b><span>submitted</span></span>
+        ${bar(s)}${counts(s)}</button>
+      <div class="rows">${vs.map(v=>{const r=roll([v]); return `<a class="vr ${r.submitted?'':'zero'}" href="${slug(v.village)}.html">
+          <span class="nm">${esc(v.village)}${!v.active?'<span class="pill">closed</span>':''}${counts(r)}</span>
+          ${bar(r)}<span class="p">${r.psub}%</span><span class="go">Open →</span></a>`;}).join('')}</div>
+    </section>`;}).join('');
+  $('#tehsils').innerHTML=html||`<div class="msg">${q?'No village matches.':'No villages have been added yet.'}</div>`;
+}
+document.addEventListener('click',e=>{
+  if(e.target.id==='rf'){ $('#district').innerHTML='<div class="msg">Loading…</div>'; load(); return; }
+  const th=e.target.closest('.th'); if(th){ const t=th.dataset.t; open.has(t)?open.delete(t):open.add(t); render(); return; }
+  const c=e.target.closest('.chip'); if(c){ const t=c.dataset.t; open.add(t); render(); document.getElementById('t-'+slug(t)).scrollIntoView({behavior:'smooth',block:'start'}); }
+});
+$('#q').addEventListener('input',()=>D&&render());
+load();
+</script>
+</body>
+</html>
